@@ -4,8 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.3] - 2025-03-02
+### :sparkles: New Features
+- [`44c1db1`](https://github.com/rogosprojects/kbak/commit/44c1db15a24cf064e6dd6628b14941e2e25bb4e9) - update README with project logo *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+### :bug: Bug Fixes
+- [`90c1554`](https://github.com/rogosprojects/kbak/commit/90c15546572821605efcbda1396d99559adf982d) - update ldflags to reference main.Version in release workflow *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+### :wrench: Chores
+- [`54d649e`](https://github.com/rogosprojects/kbak/commit/54d649eb72785df4db488b2265ab41108d980547) - update README *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+
 ## [v0.1.2] - 2025-03-02
 ### :sparkles: New Features
 - [`ae7d71e`](https://github.com/rogosprojects/kbak/commit/ae7d71e70b08dd0a505c16e1b00d0be9596de6da) - add versioning support to Docker build and application *(commit by [@rogosprojects](https://github.com/rogosprojects))*
 
 [v0.1.2]: https://github.com/rogosprojects/kbak/compare/v0.1.1...v0.1.2
+[v0.1.3]: https://github.com/rogosprojects/kbak/compare/v0.1.2...v0.1.3
