@@ -1,4 +1,8 @@
+![Project Logo](/assets/logo.jpg)
 # kbak - Kubernetes Manifest Backup Tool
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/rogosprojects/kbak?)](https://goreportcard.com/report/github.com/rogosprojects/kbak)
+[![GitHub release](https://img.shields.io/github/release/rogosprojects/kbak.svg)](https://github.com/rogosprojects/kbak/releases/latest)
 
 A Go application that backs up Kubernetes resources from a specified namespace by exporting YAML manifests, organized by resource kind.
 
@@ -95,20 +99,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-          
+
       - name: Get Version from Tag
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
         if: startsWith(github.ref, 'refs/tags/')
-          
+
       - name: Build
         run: go build -ldflags="-X main.Version=${VERSION:-dev}" -o kbak .
-        
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
