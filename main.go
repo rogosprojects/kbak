@@ -19,15 +19,21 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// Version is the current version of kbak.
+// It will be overridden during build when using ldflags.
+var Version = "dev"
+
 func main() {
 	var namespace string
 	var kubeconfig string
 	var outputDir string
 	var verbose bool
+	var showVersion bool
 
 	flag.StringVar(&namespace, "namespace", "", "Namespace to backup (required)")
 	flag.StringVar(&outputDir, "output", "backup", "Output directory for backup files")
 	flag.BoolVar(&verbose, "verbose", false, "Show verbose output")
+	flag.BoolVar(&showVersion, "version", false, "Show version information and exit")
 
 	if home := homedir.HomeDir(); home != "" {
 		flag.StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"), "Path to kubeconfig file")
@@ -36,6 +42,11 @@ func main() {
 	}
 
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("kbak version %s\n", Version)
+		os.Exit(0)
+	}
 
 	if namespace == "" {
 		fmt.Println("Error: --namespace flag is required")

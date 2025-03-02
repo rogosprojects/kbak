@@ -21,11 +21,17 @@ cd kbak
 
 # Build the application
 go build -o kbak .
+
+# Build with a specific version
+go build -ldflags="-X main.Version=1.0.0" -o kbak .
 ```
 
 ### Running the application
 
 ```bash
+# Show version information
+./kbak --version
+
 # Backup a namespace using the current kubeconfig
 ./kbak --namespace your-namespace
 
@@ -41,6 +47,9 @@ go build -o kbak .
 ```bash
 # Build the Docker image
 docker build -t kbak:latest .
+
+# Build with a specific version
+docker build --build-arg VERSION=1.0.0 -t kbak:1.0.0 .
 
 # Run with your kubeconfig mounted
 docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --namespace your-namespace
@@ -75,6 +84,40 @@ Backups are organized as follows:
     └── ...
 ```
 
+
+## CI/CD Integration
+
+When using GitHab Actions, you can automatically set the version based on git tags:
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          
+      - name: Get Version from Tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        if: startsWith(github.ref, 'refs/tags/')
+          
+      - name: Build
+        run: go build -ldflags="-X main.Version=${VERSION:-dev}" -o kbak .
+        
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: yourregistry/kbak:${{ env.VERSION || 'latest' }}
+          build-args: |
+            VERSION=${{ env.VERSION || 'dev' }}
+```
 
 ## License
 
