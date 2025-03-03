@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.4] - 2025-03-03
+### :wrench: Chores
+- [`8390c53`](https://github.com/rogosprojects/kbak/commit/8390c5340d80c7f325cc60f9547a1f782e17ce61) - simplify ldflags reference *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+
 ## [v0.1.3] - 2025-03-02
 ### :sparkles: New Features
 - [`44c1db1`](https://github.com/rogosprojects/kbak/commit/44c1db15a24cf064e6dd6628b14941e2e25bb4e9) - update README with project logo *(commit by [@rogosprojects](https://github.com/rogosprojects))*
@@ -21,3 +26,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [v0.1.2]: https://github.com/rogosprojects/kbak/compare/v0.1.1...v0.1.2
 [v0.1.3]: https://github.com/rogosprojects/kbak/compare/v0.1.2...v0.1.3
+[v0.1.4]: https://github.com/rogosprojects/kbak/compare/v0.1.3...v0.1.4
