@@ -21,23 +21,41 @@ A Go application that backs up Kubernetes resources from a specified namespace b
 - Timestamp-based backup directories
 - Simple command-line interface
 
-## Usage
+## Installation
+
+### From binaries
+
+Simply download [latest binaries](https://github.com/rogosprojects/kbak/releases/latest).
 
 ### Building from source
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/kbak.git
-cd kbak
+git clone https://github.com/rogosprojects/kbak.git && cd kbak
 
 # Build the application
 go build -o kbak .
 
-# Build with a specific version
-go build -ldflags="-X main.Version=1.0.0" -o kbak .
+# Optional: install system-wide (may require sudo)
+sudo cp kbak /usr/local/bin/
 ```
 
-### Running the application
+or
+
+```bash
+go install github.com/rogosprojects/kbak@latest
+```
+### Using Docker
+
+```bash
+# Build the Docker image
+docker build -t kbak:latest .
+
+# Run with your kubeconfig mounted
+docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --namespace your-namespace
+```
+
+## Usage
 
 ```bash
 # Show version information
@@ -53,18 +71,6 @@ go build -ldflags="-X main.Version=1.0.0" -o kbak .
 ./kbak --namespace your-namespace --output /path/to/backup/dir
 ```
 
-### Using Docker
-
-```bash
-# Build the Docker image
-docker build -t kbak:latest .
-
-# Build with a specific version
-docker build --build-arg VERSION=1.0.0 -t kbak:1.0.0 .
-
-# Run with your kubeconfig mounted
-docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --namespace your-namespace
-```
 
 ## Supported Resources
 
