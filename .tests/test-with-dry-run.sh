@@ -53,19 +53,16 @@ main() {
   # Check for required commands
   check_command "kubectl"
 
-  # Step 1: Build kbak if binary doesn't exist
-  if [ ! -f "${BUILD_DIR}/kbak" ]; then
-    print_info "Building kbak..."
-    check_command "go"
-    cd "${BUILD_DIR}" && go build -o kbak ./cmd/kbak
-    if [ $? -ne 0 ]; then
-      print_error "Failed to build kbak."
-      exit 1
-    fi
-    print_success "kbak built successfully."
-  else
-    print_info "Using existing kbak binary."
+  print_info "Building kbak..."
+  check_command "go"
+  pushd "${BUILD_DIR}" && go build -o kbak ./cmd/kbak
+  if [ $? -ne 0 ]; then
+    print_error "Failed to build kbak."
+    exit 1
   fi
+  print_success "kbak built successfully."
+  popd || exit
+
 
   # Step 2: Run kbak to backup the namespace
   print_info "Running kbak to backup namespace ${TEST_NAMESPACE}..."

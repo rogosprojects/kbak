@@ -343,6 +343,308 @@ func TestCleanDeployment(t *testing.T) {
 	}
 }
 
+func TestInferAPIVersionAndKind(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          map[string]interface{}
+		expectedKind   string
+		expectedAPIVersion string
+	}{
+		{
+			name: "Object with kind but no apiVersion",
+			input: map[string]interface{}{
+				"kind": "Pod",
+				"metadata": map[string]interface{}{
+					"name": "test-pod",
+				},
+			},
+			expectedKind: "Pod",
+			expectedAPIVersion: "v1",
+		},
+		{
+			name: "Object with kind but no apiVersion - Deployment",
+			input: map[string]interface{}{
+				"kind": "Deployment",
+				"metadata": map[string]interface{}{
+					"name": "test-deployment",
+				},
+			},
+			expectedKind: "Deployment", 
+			expectedAPIVersion: "apps/v1",
+		},
+		{
+			name: "Object with apiVersion but no kind",
+			input: map[string]interface{}{
+				"apiVersion": "apps/v1",
+				"metadata": map[string]interface{}{
+					"name": "test-resource",
+				},
+			},
+			expectedKind: "Deployment",
+			expectedAPIVersion: "apps/v1",
+		},
+		{
+			name: "Object with name pattern but no kind or apiVersion",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "app-deploy",
+				},
+			},
+			expectedKind: "Deployment",
+			expectedAPIVersion: "apps/v1",
+		},
+		{
+			name: "Object with service name pattern",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "app-svc",
+				},
+			},
+			expectedKind: "Service",
+			expectedAPIVersion: "v1",
+		},
+		{
+			name: "Object with secret name pattern",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "database-secret",
+				},
+			},
+			expectedKind: "Secret",
+			expectedAPIVersion: "v1",
+		},
+		{
+			name: "Object with job name pattern",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "backup-job",
+				},
+			},
+			expectedKind: "Job",
+			expectedAPIVersion: "batch/v1",
+		},
+		{
+			name: "Empty object needs default values",
+			input: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "unknown-resource",
+				},
+			},
+			expectedKind: "Pod", // Default fallback
+			expectedAPIVersion: "v1", // Default fallback
+		},
+		{
+			name: "Completely empty object",
+			input: map[string]interface{}{},
+			expectedKind: "Pod", // Default fallback
+			expectedAPIVersion: "v1", // Default fallback
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inferAPIVersionAndKind(tt.input)
+			
+			// Check kind
+			kind, exists := tt.input["kind"]
+			if tt.expectedKind != "" {
+				if !exists {
+					t.Errorf("kind was not set")
+				} else if kind != tt.expectedKind {
+					t.Errorf("kind = %v, want %v", kind, tt.expectedKind)
+				}
+			}
+			
+			// Check apiVersion
+			apiVersion, exists := tt.input["apiVersion"]
+			if tt.expectedAPIVersion != "" {
+				if !exists {
+					t.Errorf("apiVersion was not set")
+				} else if apiVersion != tt.expectedAPIVersion {
+					t.Errorf("apiVersion = %v, want %v", apiVersion, tt.expectedAPIVersion)
+				}
+			}
+		})
+	}
+}
+
+func TestCleanSecret(t *testing.T) {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-secret",
+			Namespace:       "test-namespace",
+			ResourceVersion: "123",
+			UID:             "secret-uid",
+			Annotations: map[string]string{
+				"custom/annotation":           "keep-this",
+				"kubernetes.io/annotation":    "remove-this",
+			},
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"username": []byte("admin"),
+			"password": []byte("super-secret"),
+		},
+	}
+
+	// Clean the Secret
+	CleanSecret(secret)
+
+	// Verify core fields are preserved
+	if secret.Name != "test-secret" {
+		t.Errorf("Secret name was changed: got %q, want %q", secret.Name, "test-secret")
+	}
+	if secret.Namespace != "test-namespace" {
+		t.Errorf("Secret namespace was changed: got %q, want %q", secret.Namespace, "test-namespace")
+	}
+
+	// Verify data fields are preserved
+	if !reflect.DeepEqual(secret.Data, map[string][]byte{"username": []byte("admin"), "password": []byte("super-secret")}) {
+		t.Errorf("Secret data was changed")
+	}
+	if secret.Type != corev1.SecretTypeOpaque {
+		t.Errorf("Secret type was changed: got %v, want %v", secret.Type, corev1.SecretTypeOpaque)
+	}
+
+	// Verify runtime fields are cleaned
+	if secret.ResourceVersion != "" {
+		t.Errorf("ResourceVersion not cleared: got %q", secret.ResourceVersion)
+	}
+	if string(secret.UID) != "" {
+		t.Errorf("UID not cleared: got %q", secret.UID)
+	}
+
+	// Verify annotations are cleaned properly
+	expectedAnnotations := map[string]string{"custom/annotation": "keep-this"}
+	if !reflect.DeepEqual(secret.Annotations, expectedAnnotations) {
+		t.Errorf("Annotations not properly cleaned: got %v, want %v", secret.Annotations, expectedAnnotations)
+	}
+
+	// Verify API version and kind are set properly
+	if secret.APIVersion != "v1" {
+		t.Errorf("APIVersion not set correctly: got %q, want %q", secret.APIVersion, "v1")
+	}
+	if secret.Kind != "Secret" {
+		t.Errorf("Kind not set correctly: got %q, want %q", secret.Kind, "Secret")
+	}
+}
+
+func TestCleanPVC(t *testing.T) {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-pvc",
+			Namespace:       "test-namespace",
+			ResourceVersion: "123",
+			UID:             "pvc-uid",
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimBound,
+		},
+	}
+
+	// Clean the PVC
+	CleanPVC(pvc)
+
+	// Verify core fields are preserved
+	if pvc.Name != "test-pvc" {
+		t.Errorf("PVC name was changed: got %q, want %q", pvc.Name, "test-pvc")
+	}
+	if pvc.Namespace != "test-namespace" {
+		t.Errorf("PVC namespace was changed: got %q, want %q", pvc.Namespace, "test-namespace")
+	}
+
+	// Verify spec fields are preserved
+	if !reflect.DeepEqual(pvc.Spec.AccessModes, []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}) {
+		t.Errorf("PVC access modes were changed")
+	}
+
+	// Verify status is cleaned
+	if pvc.Status.Phase != "" {
+		t.Errorf("Status not cleared: got %v", pvc.Status.Phase)
+	}
+
+	// Verify runtime fields are cleaned
+	if pvc.ResourceVersion != "" {
+		t.Errorf("ResourceVersion not cleared: got %q", pvc.ResourceVersion)
+	}
+	if string(pvc.UID) != "" {
+		t.Errorf("UID not cleared: got %q", pvc.UID)
+	}
+
+	// Verify API version and kind are set properly
+	if pvc.APIVersion != "v1" {
+		t.Errorf("APIVersion not set correctly: got %q, want %q", pvc.APIVersion, "v1")
+	}
+	if pvc.Kind != "PersistentVolumeClaim" {
+		t.Errorf("Kind not set correctly: got %q, want %q", pvc.Kind, "PersistentVolumeClaim")
+	}
+}
+
+func TestCleanServiceAccount(t *testing.T) {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-sa",
+			Namespace:       "test-namespace",
+			ResourceVersion: "123",
+			UID:             "sa-uid",
+		},
+		Secrets: []corev1.ObjectReference{
+			{
+				Name: "sa-token-xyz123",
+			},
+		},
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			{
+				Name: "registry-creds",
+			},
+		},
+		AutomountServiceAccountToken: func() *bool { b := true; return &b }(),
+	}
+
+	// Clean the ServiceAccount
+	CleanServiceAccount(sa)
+
+	// Verify core fields are preserved
+	if sa.Name != "test-sa" {
+		t.Errorf("ServiceAccount name was changed: got %q, want %q", sa.Name, "test-sa")
+	}
+	if sa.Namespace != "test-namespace" {
+		t.Errorf("ServiceAccount namespace was changed: got %q, want %q", sa.Namespace, "test-namespace")
+	}
+
+	// Verify server-managed fields are cleaned
+	if sa.Secrets != nil {
+		t.Errorf("Secrets not cleared: got %v", sa.Secrets)
+	}
+	if sa.ImagePullSecrets != nil {
+		t.Errorf("ImagePullSecrets not cleared: got %v", sa.ImagePullSecrets)
+	}
+
+	// Verify automount token is preserved (it's a user-set field)
+	if sa.AutomountServiceAccountToken == nil || !*sa.AutomountServiceAccountToken {
+		t.Errorf("AutomountServiceAccountToken was changed or cleared")
+	}
+
+	// Verify runtime fields are cleaned
+	if sa.ResourceVersion != "" {
+		t.Errorf("ResourceVersion not cleared: got %q", sa.ResourceVersion)
+	}
+	if string(sa.UID) != "" {
+		t.Errorf("UID not cleared: got %q", sa.UID)
+	}
+
+	// Verify API version and kind are set properly
+	if sa.APIVersion != "v1" {
+		t.Errorf("APIVersion not set correctly: got %q, want %q", sa.APIVersion, "v1")
+	}
+	if sa.Kind != "ServiceAccount" {
+		t.Errorf("Kind not set correctly: got %q, want %q", sa.Kind, "ServiceAccount")
+	}
+}
+
 func TestCleanConfigMap(t *testing.T) {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{

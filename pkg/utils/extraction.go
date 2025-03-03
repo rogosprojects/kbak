@@ -2,7 +2,10 @@ package utils
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -71,6 +74,86 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 		return result, len(result)
 		
 	case *v1.ConfigMapList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *v1.SecretList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *v1.PersistentVolumeClaimList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *v1.ServiceAccountList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *appsv1.StatefulSetList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *appsv1.DaemonSetList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *networkingv1.IngressList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *rbacv1.RoleList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *rbacv1.RoleBindingList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *batchv1.CronJobList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+		
+	case *batchv1.JobList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
 			item := item
