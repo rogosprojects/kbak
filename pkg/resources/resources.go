@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"kbak/pkg/client"
+	"github.com/rogosprojects/kbak/pkg/client"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

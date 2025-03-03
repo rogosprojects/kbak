@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"kbak/pkg/client"
-	"kbak/pkg/resources"
-	"kbak/pkg/utils"
+	"github.com/rogosprojects/kbak/pkg/client"
+	"github.com/rogosprojects/kbak/pkg/resources"
+	"github.com/rogosprojects/kbak/pkg/utils"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/yaml"

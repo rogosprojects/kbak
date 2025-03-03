@@ -1,4 +1,4 @@
-module kbak
+module github.com/rogosprojects/kbak
 
 go 1.21
 

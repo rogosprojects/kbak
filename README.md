@@ -28,7 +28,7 @@ Simply download [latest binaries](https://github.com/rogosprojects/kbak/releases
 
 ### Building from source
 ```bash
-go install github.com/rogosprojects/kbak@latest
+go install github.com/rogosprojects/kbak/cmd/kbak@latest
 ```
 or
 

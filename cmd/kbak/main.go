@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/rogosprojects/kbak/pkg/backup"
+	"github.com/rogosprojects/kbak/pkg/client"
 	"k8s.io/client-go/util/homedir"
-	"kbak/pkg/backup"
-	"kbak/pkg/client"
 )
 
 // Version is the current version of kbak.
