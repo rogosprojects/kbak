@@ -61,6 +61,6 @@ jobs:
         compress_assets: FALSE
         executable_compression: upx -v
         md5sum: false
-        ldflags: '-X github.com/${{ env.PACKAGE_NAME }}/main.Version=${{ env.RELEASE_TAG }}'
+        ldflags: '-X main.Version=${{ env.RELEASE_TAG }}'
 
 
