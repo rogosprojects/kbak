@@ -9,13 +9,14 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the source code
-COPY main.go ./
+COPY cmd/ ./cmd/
+COPY pkg/ ./pkg/
 
 # Build with version information
 # Use build arg for version, with a default value
 ARG VERSION=dev
 # Use ldflags to inject the version at build time
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-X main.Version=${VERSION}" -o kbak .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-X 'main.Version=${VERSION}'" -o kbak ./cmd/kbak
 
 # Use a minimal Alpine image for the final stage
 FROM alpine:3.19

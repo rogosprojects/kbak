@@ -1,0 +1,19 @@
+# Git
+.git
+.gitignore
+.github
+
+# Build artifacts
+kbak
+/kbak
+
+# Backup directories
+backups/
+kbak_test_output/
+
+# IDE files
+.vscode/
+.idea/
+
+# Test script
+test_kbak.sh

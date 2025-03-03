@@ -37,7 +37,7 @@ or
 git clone https://github.com/rogosprojects/kbak.git && cd kbak
 
 # Build the application
-go build -o kbak .
+go build -o kbak ./cmd/kbak
 
 # Optional: install system-wide (may require sudo)
 sudo cp kbak /usr/local/bin/
