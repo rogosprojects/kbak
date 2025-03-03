@@ -20,4 +20,8 @@ vendor/
 .idea/
 
 # Backup output directory
-backup/
+backups/
+
+# Tests
+kbak_test_output/
+test_kbak.sh

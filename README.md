@@ -19,7 +19,6 @@ A Go application that backs up Kubernetes resources from a specified namespace b
 - Organizes backups by resource kind in separate directories
 - Thoroughly cleans manifests by removing server-side and cluster-specific fields
 - Timestamp-based backup directories
-- Simple command-line interface
 
 ## Installation
 
@@ -28,6 +27,10 @@ A Go application that backs up Kubernetes resources from a specified namespace b
 Simply download [latest binaries](https://github.com/rogosprojects/kbak/releases/latest).
 
 ### Building from source
+```bash
+go install github.com/rogosprojects/kbak@latest
+```
+or
 
 ```bash
 # Clone the repository
@@ -39,13 +42,7 @@ go build -o kbak .
 # Optional: install system-wide (may require sudo)
 sudo cp kbak /usr/local/bin/
 ```
-
-or
-
-```bash
-go install github.com/rogosprojects/kbak@latest
-```
-### Using Docker
+#### Using Docker
 
 ```bash
 # Build the Docker image
