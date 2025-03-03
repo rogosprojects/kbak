@@ -107,6 +107,11 @@ func GetResourceTypes() []ResourceType {
 
 // IsNotFoundError checks if an error is a "not found" error
 func IsNotFoundError(err error) bool {
+	// Handle nil error case
+	if err == nil {
+		return false
+	}
+	
 	// Check if the error message contains common "not found" indicators
 	errMsg := err.Error()
 	notFoundIndicators := []string{

@@ -22,11 +22,13 @@ func main() {
 	var outputDir string
 	var verbose bool
 	var showVersion bool
+	var allNamespaces bool
 
-	flag.StringVar(&namespace, "namespace", "", "Namespace to backup (required)")
+	flag.StringVar(&namespace, "namespace", "", "Namespace to backup (required unless --all-namespaces is used)")
 	flag.StringVar(&outputDir, "output", "backups", "Output directory for backup files")
 	flag.BoolVar(&verbose, "verbose", false, "Show verbose output")
 	flag.BoolVar(&showVersion, "version", false, "Show version information and exit")
+	flag.BoolVar(&allNamespaces, "all-namespaces", false, "Backup resources from all namespaces")
 
 	if home := homedir.HomeDir(); home != "" {
 		flag.StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"), "Path to kubeconfig file")
@@ -41,10 +43,31 @@ func main() {
 		os.Exit(0)
 	}
 
-	if namespace == "" {
-		fmt.Println("Error: --namespace flag is required")
+	// Validate namespace requirements
+	if namespace == "" && !allNamespaces {
+		fmt.Println("Error: either --namespace or --all-namespaces flag is required")
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if allNamespaces && namespace != "" {
+		fmt.Println("Warning: --namespace flag is ignored when --all-namespaces is used")
+		namespace = ""
+	}
+
+	// Initialize Kubernetes client first to validate connectivity
+	k8sClient, err := client.NewClient(kubeconfig, verbose)
+	if err != nil {
+		fmt.Printf("Error initializing Kubernetes client: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Handle all-namespaces case (not implemented yet, just a placeholder)
+	if allNamespaces {
+		fmt.Println("Error: --all-namespaces is not implemented yet")
+		os.Exit(1)
+		// Here we would get a list of all namespaces and iterate through them
+		// This feature is left for future implementation
 	}
 
 	// Create output directory with timestamp
@@ -58,23 +81,18 @@ func main() {
 
 	fmt.Printf("Starting backup of namespace '%s' to '%s'\n", namespace, backupDir)
 
-	// Initialize Kubernetes client
-	k8sClient, err := client.NewClient(kubeconfig, verbose)
-	if err != nil {
-		fmt.Printf("Error initializing Kubernetes client: %v\n", err)
-		os.Exit(1)
-	}
-
 	// Perform backup
 	resourceCount, errorCount := backup.PerformBackup(k8sClient, namespace, backupDir, verbose)
-
-	if errorCount > 0 {
-		fmt.Printf("Completed with %d errors\n", errorCount)
-	}
 
 	if resourceCount > 0 {
 		fmt.Printf("Backup completed successfully to %s (%d resources total)\n", backupDir, resourceCount)
 	} else {
 		fmt.Printf("No resources found to backup in namespace '%s'\n", namespace)
+	}
+
+	// Exit with error code if there were errors
+	if errorCount > 0 {
+		fmt.Printf("Completed with %d errors\n", errorCount)
+		os.Exit(1)
 	}
 }
