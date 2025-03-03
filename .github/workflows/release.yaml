@@ -62,5 +62,6 @@ jobs:
         executable_compression: upx -v
         md5sum: false
         ldflags: '-X main.Version=${{ env.RELEASE_TAG }}'
+        project_path: ./cmd/kbak/
 
 
