@@ -6,6 +6,13 @@
 
 A Go application that backs up Kubernetes resources from a specified namespace by exporting YAML manifests, organized by resource kind.
 
+## Use Cases
+
+- **Disaster Recovery**: Create point-in-time snapshots of your Kubernetes resources for quick restoration in case of accidental deletions or cluster failures.
+- **Environment Migration**: Export manifests from one environment (e.g., staging) for deployment in another environment (e.g., production) with necessary modifications.
+- **Version Control**: Store your Kubernetes configurations in version control to track changes and maintain configuration history over time.
+- **Auditing and Compliance**: Generate snapshots of your cluster state for auditing purposes and compliance requirements.
+
 ## Features
 
 - Exports all standard Kubernetes resources from a namespace
