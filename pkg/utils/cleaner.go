@@ -23,6 +23,10 @@ func CleanObject(obj interface{}) {
 	// Service
 	case *v1.Service:
 		CleanService(typedObj)
+		
+	// ConfigMap
+	case *v1.ConfigMap:
+		CleanConfigMap(typedObj)
 
 	// For all other types, try as unstructured
 	default:
@@ -181,6 +185,19 @@ func CleanService(svc *v1.Service) {
 
 	// Always clear health check node port as it's assigned by the system
 	svc.Spec.HealthCheckNodePort = 0
+}
+
+// CleanConfigMap removes server-side fields from a ConfigMap
+func CleanConfigMap(cm *v1.ConfigMap) {
+	// Clean metadata
+	CleanMetadata(&cm.ObjectMeta)
+	
+	// Set API version and kind for valid Kubernetes manifests
+	cm.APIVersion = "v1"
+	cm.Kind = "ConfigMap"
+	
+	// Keep the data and binaryData fields intact
+	// No need to modify the actual ConfigMap data
 }
 
 // CleanMetadata removes server-side fields from ObjectMeta

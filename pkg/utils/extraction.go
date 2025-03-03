@@ -69,6 +69,14 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
+		
+	case *v1.ConfigMapList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
 
 	// For all other types, use a more generic approach
 	default:

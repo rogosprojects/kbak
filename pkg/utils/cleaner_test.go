@@ -342,3 +342,66 @@ func TestCleanDeployment(t *testing.T) {
 			deployNoSelector.Spec.Selector.MatchLabels, map[string]string{"app": "test"})
 	}
 }
+
+func TestCleanConfigMap(t *testing.T) {
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-configmap",
+			Namespace:       "test-namespace",
+			ResourceVersion: "123",
+			UID:             "cm-uid",
+			Annotations: map[string]string{
+				"custom/annotation":           "keep-this",
+				"kubernetes.io/annotation":    "remove-this",
+			},
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
+		},
+		BinaryData: map[string][]byte{
+			"binary1": []byte{1, 2, 3, 4},
+		},
+	}
+
+	// Clean the ConfigMap
+	CleanConfigMap(cm)
+
+	// Verify core fields are preserved
+	if cm.Name != "test-configmap" {
+		t.Errorf("ConfigMap name was changed: got %q, want %q", cm.Name, "test-configmap")
+	}
+	if cm.Namespace != "test-namespace" {
+		t.Errorf("ConfigMap namespace was changed: got %q, want %q", cm.Namespace, "test-namespace")
+	}
+
+	// Verify data fields are preserved
+	if !reflect.DeepEqual(cm.Data, map[string]string{"key1": "value1", "key2": "value2"}) {
+		t.Errorf("ConfigMap data was changed: got %v", cm.Data)
+	}
+	if !reflect.DeepEqual(cm.BinaryData, map[string][]byte{"binary1": {1, 2, 3, 4}}) {
+		t.Errorf("ConfigMap binary data was changed: got %v", cm.BinaryData)
+	}
+
+	// Verify runtime fields are cleaned
+	if cm.ResourceVersion != "" {
+		t.Errorf("ResourceVersion not cleared: got %q", cm.ResourceVersion)
+	}
+	if string(cm.UID) != "" {
+		t.Errorf("UID not cleared: got %q", cm.UID)
+	}
+
+	// Verify annotations are cleaned properly
+	expectedAnnotations := map[string]string{"custom/annotation": "keep-this"}
+	if !reflect.DeepEqual(cm.Annotations, expectedAnnotations) {
+		t.Errorf("Annotations not properly cleaned: got %v, want %v", cm.Annotations, expectedAnnotations)
+	}
+
+	// Verify API version and kind are set properly
+	if cm.APIVersion != "v1" {
+		t.Errorf("APIVersion not set correctly: got %q, want %q", cm.APIVersion, "v1")
+	}
+	if cm.Kind != "ConfigMap" {
+		t.Errorf("Kind not set correctly: got %q, want %q", cm.Kind, "ConfigMap")
+	}
+}
