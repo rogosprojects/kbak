@@ -15,8 +15,8 @@ type ResourceType struct {
 	APIFunc func(client *client.K8sClient, namespace string, opts metav1.ListOptions) (interface{}, error)
 }
 
-// GetResourceTypes returns a list of Kubernetes resource types to backup
-func GetResourceTypes() []ResourceType {
+// GetAllResourceTypes returns all supported Kubernetes resource types
+func GetAllResourceTypes() []ResourceType {
 	return []ResourceType{
 		{
 			Kind: "Pod",
@@ -105,13 +105,34 @@ func GetResourceTypes() []ResourceType {
 	}
 }
 
+// GetResourceTypes returns a filtered list of Kubernetes resource types to backup
+// If selectedTypes is empty, all resource types are returned
+func GetResourceTypes(selectedTypes map[string]bool) []ResourceType {
+	allTypes := GetAllResourceTypes()
+
+	// If no resource types are specified, return all types
+	if len(selectedTypes) == 0 {
+		return allTypes
+	}
+
+	// Filter resource types based on selection
+	var filteredTypes []ResourceType
+	for _, resourceType := range allTypes {
+		if selectedTypes[strings.ToLower(resourceType.Kind)] {
+			filteredTypes = append(filteredTypes, resourceType)
+		}
+	}
+
+	return filteredTypes
+}
+
 // IsNotFoundError checks if an error is a "not found" error
 func IsNotFoundError(err error) bool {
 	// Handle nil error case
 	if err == nil {
 		return false
 	}
-	
+
 	// Check if the error message contains common "not found" indicators
 	errMsg := err.Error()
 	notFoundIndicators := []string{

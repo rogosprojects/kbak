@@ -4,12 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.9] - 2025-03-06
+### :sparkles: New Features
+- Add resource type filtering with flags for selectively backing up specific resource types
+- Allow users to specify one or more resource types to include in the backup (e.g., --configmap --secret)
+- Updated documentation with examples for resource type filtering
+
 ## [v0.1.8] - 2025-03-03
 ### :sparkles: New Features
 - [`b5ab86d`](https://github.com/rogosprojects/kbak/commit/b5ab86d5eeb06756ad1135303f36582736ec2959) - add tests for client and backup functionality, improve error handling in main *(commit by [@rogosprojects](https://github.com/rogosprojects))*
 - [`0ebb1c4`](https://github.com/rogosprojects/kbak/commit/0ebb1c4c4b1d53e2f5723e4b632252752348e7cf) - add ConfigMap handling *(commit by [@rogosprojects](https://github.com/rogosprojects))*
 - [`6b89edf`](https://github.com/rogosprojects/kbak/commit/6b89edf5265a19e9db99d4fd6a0d9649eb266e93) - enhance extraction utility with additional Kubernetes resource support and improve build script *(commit by [@rogosprojects](https://github.com/rogosprojects))*
-
 
 ## [v0.1.7] - 2025-03-03
 ### :bug: Bug Fixes

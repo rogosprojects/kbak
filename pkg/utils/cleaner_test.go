@@ -76,7 +76,7 @@ func TestCleanMetadata(t *testing.T) {
 		t.Errorf("Labels were changed, got %v, want %v", metaCopy.Labels, map[string]string{"app": "test"})
 	}
 	if !reflect.DeepEqual(metaCopy.Annotations, map[string]string{"custom/ann": "keep"}) {
-		t.Errorf("Annotations were not cleaned correctly, got %v, want %v", 
+		t.Errorf("Annotations were not cleaned correctly, got %v, want %v",
 			metaCopy.Annotations, map[string]string{"custom/ann": "keep"})
 	}
 
@@ -121,8 +121,8 @@ func TestCleanPod(t *testing.T) {
 			UID:             "pod-uid",
 		},
 		Spec: corev1.PodSpec{
-			NodeName:                "node1",
-			ServiceAccountName:      "default",
+			NodeName:                 "node1",
+			ServiceAccountName:       "default",
 			DeprecatedServiceAccount: "old-sa",
 		},
 		Status: corev1.PodStatus{
@@ -333,21 +333,21 @@ func TestCleanDeployment(t *testing.T) {
 	}
 
 	CleanDeployment(deployNoSelector)
-	
+
 	// Selector should be created based on template labels
 	if deployNoSelector.Spec.Selector == nil {
 		t.Errorf("Selector was not created for deployment without selector")
 	} else if !reflect.DeepEqual(deployNoSelector.Spec.Selector.MatchLabels, map[string]string{"app": "test"}) {
-		t.Errorf("Selector not created correctly: got %v, want %v", 
+		t.Errorf("Selector not created correctly: got %v, want %v",
 			deployNoSelector.Spec.Selector.MatchLabels, map[string]string{"app": "test"})
 	}
 }
 
 func TestInferAPIVersionAndKind(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          map[string]interface{}
-		expectedKind   string
+		name               string
+		input              map[string]interface{}
+		expectedKind       string
 		expectedAPIVersion string
 	}{
 		{
@@ -358,7 +358,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "test-pod",
 				},
 			},
-			expectedKind: "Pod",
+			expectedKind:       "Pod",
 			expectedAPIVersion: "v1",
 		},
 		{
@@ -369,7 +369,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "test-deployment",
 				},
 			},
-			expectedKind: "Deployment", 
+			expectedKind:       "Deployment",
 			expectedAPIVersion: "apps/v1",
 		},
 		{
@@ -380,7 +380,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "test-resource",
 				},
 			},
-			expectedKind: "Deployment",
+			expectedKind:       "Deployment",
 			expectedAPIVersion: "apps/v1",
 		},
 		{
@@ -390,7 +390,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "app-deploy",
 				},
 			},
-			expectedKind: "Deployment",
+			expectedKind:       "Deployment",
 			expectedAPIVersion: "apps/v1",
 		},
 		{
@@ -400,7 +400,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "app-svc",
 				},
 			},
-			expectedKind: "Service",
+			expectedKind:       "Service",
 			expectedAPIVersion: "v1",
 		},
 		{
@@ -410,7 +410,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "database-secret",
 				},
 			},
-			expectedKind: "Secret",
+			expectedKind:       "Secret",
 			expectedAPIVersion: "v1",
 		},
 		{
@@ -420,7 +420,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "backup-job",
 				},
 			},
-			expectedKind: "Job",
+			expectedKind:       "Job",
 			expectedAPIVersion: "batch/v1",
 		},
 		{
@@ -430,21 +430,21 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					"name": "unknown-resource",
 				},
 			},
-			expectedKind: "Pod", // Default fallback
-			expectedAPIVersion: "v1", // Default fallback
+			expectedKind:       "Pod", // Default fallback
+			expectedAPIVersion: "v1",  // Default fallback
 		},
 		{
-			name: "Completely empty object",
-			input: map[string]interface{}{},
-			expectedKind: "Pod", // Default fallback
-			expectedAPIVersion: "v1", // Default fallback
+			name:               "Completely empty object",
+			input:              map[string]interface{}{},
+			expectedKind:       "Pod", // Default fallback
+			expectedAPIVersion: "v1",  // Default fallback
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			inferAPIVersionAndKind(tt.input)
-			
+
 			// Check kind
 			kind, exists := tt.input["kind"]
 			if tt.expectedKind != "" {
@@ -454,7 +454,7 @@ func TestInferAPIVersionAndKind(t *testing.T) {
 					t.Errorf("kind = %v, want %v", kind, tt.expectedKind)
 				}
 			}
-			
+
 			// Check apiVersion
 			apiVersion, exists := tt.input["apiVersion"]
 			if tt.expectedAPIVersion != "" {
@@ -476,8 +476,8 @@ func TestCleanSecret(t *testing.T) {
 			ResourceVersion: "123",
 			UID:             "secret-uid",
 			Annotations: map[string]string{
-				"custom/annotation":           "keep-this",
-				"kubernetes.io/annotation":    "remove-this",
+				"custom/annotation":        "keep-this",
+				"kubernetes.io/annotation": "remove-this",
 			},
 		},
 		Type: corev1.SecretTypeOpaque,
@@ -653,8 +653,8 @@ func TestCleanConfigMap(t *testing.T) {
 			ResourceVersion: "123",
 			UID:             "cm-uid",
 			Annotations: map[string]string{
-				"custom/annotation":           "keep-this",
-				"kubernetes.io/annotation":    "remove-this",
+				"custom/annotation":        "keep-this",
+				"kubernetes.io/annotation": "remove-this",
 			},
 		},
 		Data: map[string]string{

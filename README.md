@@ -66,7 +66,37 @@ docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --
 
 # Specify a custom output directory
 ./kbak --namespace your-namespace --output /path/to/backup/dir
+
+# Backup only specific resource types (e.g., only ConfigMaps and Secrets)
+./kbak --namespace your-namespace --configmap --secret --all-resources=false
+
+# Backup only pods and deployments
+./kbak --namespace your-namespace --pod --deployment --all-resources=false
 ```
+
+### Resource Type Filtering
+
+You can selectively backup specific resource types using these flags:
+
+```
+--all-resources   Backup all resource types (default: true)
+--pod             Backup only pods
+--deployment      Backup only deployments
+--service         Backup only services
+--configmap       Backup only configmaps
+--secret          Backup only secrets
+--pvc             Backup only persistent volume claims
+--serviceaccount  Backup only service accounts
+--statefulset     Backup only statefulsets
+--daemonset       Backup only daemonsets
+--ingress         Backup only ingresses
+--role            Backup only roles
+--rolebinding     Backup only rolebindings
+--cronjob         Backup only cronjobs
+--job             Backup only jobs
+```
+
+When using resource type flags, set `--all-resources=false` to backup only the specified types.
 
 
 ## Supported Resources

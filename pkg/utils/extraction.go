@@ -72,7 +72,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *v1.ConfigMapList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -80,7 +80,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *v1.SecretList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -88,7 +88,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *v1.PersistentVolumeClaimList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -96,7 +96,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *v1.ServiceAccountList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -104,7 +104,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *appsv1.StatefulSetList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -112,7 +112,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *appsv1.DaemonSetList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -120,7 +120,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *networkingv1.IngressList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -128,7 +128,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *rbacv1.RoleList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -136,7 +136,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *rbacv1.RoleBindingList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -144,7 +144,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *batchv1.CronJobList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
@@ -152,7 +152,7 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 			result[i] = &item
 		}
 		return result, len(result)
-		
+
 	case *batchv1.JobList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {

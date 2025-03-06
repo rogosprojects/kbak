@@ -23,19 +23,19 @@ func CleanObject(obj interface{}) {
 	// Service
 	case *v1.Service:
 		CleanService(typedObj)
-		
+
 	// ConfigMap
 	case *v1.ConfigMap:
 		CleanConfigMap(typedObj)
-		
+
 	// Secret
 	case *v1.Secret:
 		CleanSecret(typedObj)
-		
+
 	// PersistentVolumeClaim
 	case *v1.PersistentVolumeClaim:
 		CleanPVC(typedObj)
-		
+
 	// ServiceAccount
 	case *v1.ServiceAccount:
 		CleanServiceAccount(typedObj)
@@ -51,7 +51,7 @@ func CleanObject(obj interface{}) {
 			// Do not delete these fields under any circumstances
 			apiVersion, apiVersionExists := unstr["apiVersion"]
 			kind, kindExists := unstr["kind"]
-			
+
 			// If either field is missing or empty, try to infer them
 			if !apiVersionExists || apiVersion == "" || !kindExists || kind == "" {
 				inferAPIVersionAndKind(unstr)
@@ -116,7 +116,7 @@ func inferAPIVersionAndKind(obj map[string]interface{}) {
 			obj["apiVersion"] = "apiextensions.k8s.io/v1"
 		}
 	}
-	
+
 	// Try to infer kind if apiVersion exists
 	if apiVersion, ok := obj["apiVersion"].(string); ok && apiVersion != "" {
 		// If there's already a kind, don't overwrite it
@@ -140,7 +140,7 @@ func inferAPIVersionAndKind(obj map[string]interface{}) {
 			}
 		}
 	}
-	
+
 	// If still no apiVersion and kind, try to infer from metadata or resource structure
 	if _, hasApiVersion := obj["apiVersion"].(string); !hasApiVersion {
 		if _, hasKind := obj["kind"].(string); !hasKind {
@@ -194,7 +194,7 @@ func inferAPIVersionAndKind(obj map[string]interface{}) {
 					}
 				}
 			}
-			
+
 			// If still no values, set defaults as last resort
 			if _, hasApiVersion := obj["apiVersion"].(string); !hasApiVersion {
 				obj["apiVersion"] = "v1"
@@ -328,11 +328,11 @@ func CleanService(svc *v1.Service) {
 func CleanConfigMap(cm *v1.ConfigMap) {
 	// Clean metadata
 	CleanMetadata(&cm.ObjectMeta)
-	
+
 	// Set API version and kind for valid Kubernetes manifests
 	cm.APIVersion = "v1"
 	cm.Kind = "ConfigMap"
-	
+
 	// Keep the data and binaryData fields intact
 	// No need to modify the actual ConfigMap data
 }
@@ -341,11 +341,11 @@ func CleanConfigMap(cm *v1.ConfigMap) {
 func CleanSecret(secret *v1.Secret) {
 	// Clean metadata
 	CleanMetadata(&secret.ObjectMeta)
-	
+
 	// Set API version and kind for valid Kubernetes manifests
 	secret.APIVersion = "v1"
 	secret.Kind = "Secret"
-	
+
 	// Keep the data and type fields intact
 	// The actual Secret data should be preserved
 }
@@ -354,14 +354,14 @@ func CleanSecret(secret *v1.Secret) {
 func CleanPVC(pvc *v1.PersistentVolumeClaim) {
 	// Clean metadata
 	CleanMetadata(&pvc.ObjectMeta)
-	
+
 	// Set API version and kind for valid Kubernetes manifests
 	pvc.APIVersion = "v1"
 	pvc.Kind = "PersistentVolumeClaim"
-	
+
 	// Remove status
 	pvc.Status = v1.PersistentVolumeClaimStatus{}
-	
+
 	// Clean spec but keep essential fields
 	// Don't modify storageClassName, accessModes, resources
 }
@@ -370,15 +370,15 @@ func CleanPVC(pvc *v1.PersistentVolumeClaim) {
 func CleanServiceAccount(sa *v1.ServiceAccount) {
 	// Clean metadata
 	CleanMetadata(&sa.ObjectMeta)
-	
+
 	// Set API version and kind for valid Kubernetes manifests
 	sa.APIVersion = "v1"
 	sa.Kind = "ServiceAccount"
-	
+
 	// Clean other server-generated fields
-	sa.Secrets = nil        // Server manages the secrets references
-	sa.ImagePullSecrets = nil  // Only keep manually added ones
-	
+	sa.Secrets = nil          // Server manages the secrets references
+	sa.ImagePullSecrets = nil // Only keep manually added ones
+
 	// Keep essential fields like automountServiceAccountToken if set
 }
 

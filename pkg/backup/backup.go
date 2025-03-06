@@ -16,8 +16,8 @@ import (
 
 // BackupStats tracks statistics and results from a backup operation
 type BackupStats struct {
-	ResourceCount    int
-	ErrorCount       int
+	ResourceCount     int
+	ErrorCount        int
 	ResourcesBackedUp map[string]int
 	ResourceErrors    map[string]int
 }
@@ -25,18 +25,23 @@ type BackupStats struct {
 // NewBackupStats creates and initializes a new BackupStats object
 func NewBackupStats() *BackupStats {
 	return &BackupStats{
-		ResourceCount:    0,
-		ErrorCount:       0,
+		ResourceCount:     0,
+		ErrorCount:        0,
 		ResourcesBackedUp: make(map[string]int),
 		ResourceErrors:    make(map[string]int),
 	}
 }
 
-// PerformBackup performs the backup of all resources in the specified namespace
+// PerformBackup performs the backup of resources in the specified namespace
 // Returns statistics about the backup operation including counts of resources backed up and errors
-func PerformBackup(k8sClient *client.K8sClient, namespace, backupDir string, verbose bool) (int, int) {
+func PerformBackup(k8sClient *client.K8sClient, namespace, backupDir string, selectedTypes map[string]bool, verbose bool) (int, int) {
 	stats := NewBackupStats()
-	resourceTypes := resources.GetResourceTypes()
+	resourceTypes := resources.GetResourceTypes(selectedTypes)
+
+	if len(resourceTypes) == 0 && verbose {
+		fmt.Println("Warning: No resource types selected for backup")
+		return 0, 0
+	}
 
 	// Backup each resource type
 	for _, resource := range resourceTypes {
@@ -52,12 +57,12 @@ func ensureValidFilename(name string) string {
 	if name == "" {
 		return "unnamed"
 	}
-	
+
 	// If it's just a dot, replace it to avoid hidden files
 	if name == "." {
 		return "_dot_"
 	}
-	
+
 	// Replace characters that are problematic in filenames
 	replacer := strings.NewReplacer(
 		" ", "_",
@@ -71,33 +76,33 @@ func ensureValidFilename(name string) string {
 		">", "_",
 		"|", "_",
 	)
-	
+
 	// Apply replacements
 	result := replacer.Replace(name)
-	
+
 	// Handle leading dots to avoid hidden files
 	if strings.HasPrefix(result, ".") {
 		result = "_" + result
 	}
-	
+
 	// Clean the path to eliminate any issues
 	result = filepath.Base(filepath.Clean(result))
-	
+
 	// Trim any leading or trailing problematic characters
 	result = strings.Trim(result, "._-")
-	
+
 	// If we ended up with an empty string after trimming, use a default
 	if result == "" {
 		return "unnamed"
 	}
-	
+
 	return result
 }
 
 // backupResourceType handles the backup of a single resource type
-func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string, 
+func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string,
 	resource resources.ResourceType, stats *BackupStats, verbose bool) {
-	
+
 	var objects interface{}
 	var err error
 
