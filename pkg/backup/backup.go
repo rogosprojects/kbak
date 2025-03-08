@@ -39,7 +39,8 @@ func PerformBackup(k8sClient *client.K8sClient, namespace, backupDir string, sel
 	resourceTypes := resources.GetResourceTypes(selectedTypes)
 
 	if len(resourceTypes) == 0 && verbose {
-		fmt.Println("Warning: No resource types selected for backup")
+		fmt.Printf("%s %s%sWarning: No resource types selected for backup%s\n",
+			utils.WarningEmoji, utils.Yellow, utils.Bold, utils.Reset)
 		return 0, 0
 	}
 
@@ -113,13 +114,17 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		// Check if this is a "resource not found" type of error
 		if resources.IsNotFoundError(err) {
 			if verbose {
-				fmt.Printf("Resource type %s not available in the cluster, skipping\n", resource.Kind)
+				fmt.Printf("%s %sResource type %s not available in the cluster, skipping%s\n",
+					utils.SkippedEmoji, utils.Cyan, resource.Kind, utils.Reset)
 			}
 		} else {
-			fmt.Printf("Error listing %s: %v\n", resource.Kind, err)
+			fmt.Printf("%s %s%sError listing %s: %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, err, utils.Reset)
 			if verbose {
-				fmt.Printf("Debug info - API endpoint: %s\n", k8sClient.Config.Host)
-				fmt.Printf("Debug info - Resource: %s in namespace %s\n", resource.Kind, namespace)
+				fmt.Printf("%sDebug info - API endpoint: %s%s\n",
+					utils.BrightBlue, k8sClient.Config.Host, utils.Reset)
+				fmt.Printf("%sDebug info - Resource: %s in namespace %s%s\n",
+					utils.BrightBlue, resource.Kind, namespace, utils.Reset)
 			}
 			stats.ErrorCount++
 			stats.ResourceErrors[resource.Kind]++
@@ -129,13 +134,15 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 
 	// Debug the response from the API
 	if verbose {
-		fmt.Printf("Response type for %s: %T\n", resource.Kind, objects)
+		fmt.Printf("%sResponse type for %s: %T%s\n",
+			utils.BrightBlue, resource.Kind, objects, utils.Reset)
 	}
 
 	// Extract items from the list
 	items, itemCount := utils.ExtractItems(objects)
 	if verbose {
-		fmt.Printf("Found %d %s resources in namespace %s\n", itemCount, resource.Kind, namespace)
+		fmt.Printf("%s%sFound %d %s resources in namespace %s%s\n",
+			utils.InfoEmoji, utils.Cyan, itemCount, resource.Kind, namespace, utils.Reset)
 	}
 	if itemCount == 0 {
 		// Skip creating directories for resource kinds with no items
@@ -145,7 +152,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 	// Create directory for this resource kind
 	kindDir := filepath.Join(backupDir, resource.Kind)
 	if err := os.MkdirAll(kindDir, 0755); err != nil {
-		fmt.Printf("Error creating directory for %s: %v\n", resource.Kind, err)
+		fmt.Printf("%s %s%sError creating directory for %s: %v%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, err, utils.Reset)
 		stats.ErrorCount++
 		stats.ResourceErrors[resource.Kind]++
 		return
@@ -165,7 +173,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		// Ensure the filename is valid for the filesystem
 		safeName := ensureValidFilename(name)
 		if safeName != name && verbose {
-			fmt.Printf("Resource name %q sanitized to %q for filesystem compatibility\n", name, safeName)
+			fmt.Printf("%s%sResource name %q sanitized to %q for filesystem compatibility%s\n",
+				utils.InfoEmoji, utils.BrightBlue, name, safeName, utils.Reset)
 		}
 
 		// Remove cluster-specific and runtime fields
@@ -174,7 +183,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		// Convert to YAML
 		yamlData, err := yaml.Marshal(item)
 		if err != nil {
-			fmt.Printf("Error marshaling %s '%s': %v\n", resource.Kind, name, err)
+			fmt.Printf("%s %s%sError marshaling %s '%s': %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, name, err, utils.Reset)
 			stats.ErrorCount++
 			stats.ResourceErrors[resource.Kind]++
 			continue
@@ -183,7 +193,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		// Save to file
 		filename := filepath.Join(kindDir, safeName+".yaml")
 		if err := os.WriteFile(filename, yamlData, 0644); err != nil {
-			fmt.Printf("Error writing %s '%s': %v\n", resource.Kind, name, err)
+			fmt.Printf("%s %s%sError writing %s '%s': %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, name, err, utils.Reset)
 			stats.ErrorCount++
 			stats.ResourceErrors[resource.Kind]++
 			continue
@@ -193,7 +204,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 	}
 
 	if itemsBackedUp > 0 {
-		fmt.Printf("Backed up %d %s resources\n", itemsBackedUp, resource.Kind)
+		fmt.Printf("%s%sBacked up %d %s resources%s\n",
+			utils.Green, utils.Bold, itemsBackedUp, resource.Kind, utils.Reset)
 		stats.ResourceCount += itemsBackedUp
 		stats.ResourcesBackedUp[resource.Kind] = itemsBackedUp
 	}

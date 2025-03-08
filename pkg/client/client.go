@@ -3,6 +3,8 @@ package client
 import (
 	"fmt"
 
+	"github.com/rogosprojects/kbak/pkg/utils"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -29,7 +31,8 @@ func NewClient(kubeconfig string, verbose bool) (*K8sClient, error) {
 		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 		clientConfig, err := kubeConfig.ClientConfig()
 		if err != nil {
-			fmt.Printf("Error building kubeconfig from current context: %v\n", err)
+			fmt.Printf("%s %s%sError building kubeconfig from current context: %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
 			// Fall back to default config as a last resort
 			config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 			if err != nil {
@@ -41,7 +44,8 @@ func NewClient(kubeconfig string, verbose bool) (*K8sClient, error) {
 	}
 
 	if verbose {
-		fmt.Printf("Using Kubernetes API at: %s\n", config.Host)
+		fmt.Printf("%s %s%sUsing Kubernetes API at: %s%s\n",
+			utils.K8sEmoji, utils.Blue, utils.Bold, config.Host, utils.Reset)
 	}
 
 	// Create clientset

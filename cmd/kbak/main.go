@@ -9,6 +9,7 @@ import (
 
 	"github.com/rogosprojects/kbak/pkg/backup"
 	"github.com/rogosprojects/kbak/pkg/client"
+	"github.com/rogosprojects/kbak/pkg/utils"
 	"k8s.io/client-go/util/homedir"
 )
 
@@ -79,32 +80,37 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("kbak version %s\n", Version)
+		fmt.Printf("%s %skbak%s version %s %s%s\n",
+			utils.K8sEmoji, utils.Bold, utils.Reset, utils.Cyan, Version, utils.Reset)
 		os.Exit(0)
 	}
 
 	// Validate namespace requirements
 	if namespace == "" && !allNamespaces {
-		fmt.Println("Error: either --namespace or --all-namespaces flag is required")
+		fmt.Printf("%s %s%sError: either --namespace or --all-namespaces flag is required%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, utils.Reset)
 		flag.Usage()
 		os.Exit(1)
 	}
 
 	if allNamespaces && namespace != "" {
-		fmt.Println("Warning: --namespace flag is ignored when --all-namespaces is used")
+		fmt.Printf("%s %s%sWarning: --namespace flag is ignored when --all-namespaces is used%s\n",
+			utils.WarningEmoji, utils.Yellow, utils.Bold, utils.Reset)
 		namespace = ""
 	}
 
 	// Initialize Kubernetes client first to validate connectivity
 	k8sClient, err := client.NewClient(kubeconfig, verbose)
 	if err != nil {
-		fmt.Printf("Error initializing Kubernetes client: %v\n", err)
+		fmt.Printf("%s %s%sError initializing Kubernetes client: %v%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
 		os.Exit(1)
 	}
 
 	// Handle all-namespaces case (not implemented yet, just a placeholder)
 	if allNamespaces {
-		fmt.Println("Error: --all-namespaces is not implemented yet")
+		fmt.Printf("%s %s%sError: --all-namespaces is not implemented yet%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, utils.Reset)
 		os.Exit(1)
 		// Here we would get a list of all namespaces and iterate through them
 		// This feature is left for future implementation
@@ -115,7 +121,8 @@ func main() {
 	backupDir := filepath.Join(outputDir, timestamp, namespace)
 
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		fmt.Printf("Error creating output directory: %v\n", err)
+		fmt.Printf("%s %s%sError creating output directory: %v%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
 		os.Exit(1)
 	}
 
@@ -123,23 +130,28 @@ func main() {
 	selectedTypes := buildResourceTypeMap(resFlags)
 
 	if len(selectedTypes) > 0 {
-		fmt.Printf("Starting backup of selected resource types from namespace '%s' to '%s'\n", namespace, backupDir)
+		fmt.Printf("%s %s%sStarting backup of selected resource types from namespace '%s' to '%s'%s\n\n",
+			utils.StartEmoji, utils.Blue, utils.Bold, namespace, backupDir, utils.Reset)
 	} else {
-		fmt.Printf("Starting backup of all resource types from namespace '%s' to '%s'\n", namespace, backupDir)
+		fmt.Printf("%s %s%sStarting backup of all resource types from namespace '%s' to '%s'%s\n\n",
+			utils.StartEmoji, utils.Blue, utils.Bold, namespace, backupDir, utils.Reset)
 	}
 
 	// Perform backup
 	resourceCount, errorCount := backup.PerformBackup(k8sClient, namespace, backupDir, selectedTypes, verbose)
 
 	if resourceCount > 0 {
-		fmt.Printf("Backup completed successfully to %s (%d resources total)\n", backupDir, resourceCount)
+		fmt.Printf("\n%s %s%sBackup completed successfully to %s (%d resources total)%s\n",
+			utils.SuccessEmoji, utils.Green, utils.Bold, backupDir, resourceCount, utils.Reset)
 	} else {
-		fmt.Printf("No resources found to backup in namespace '%s'\n", namespace)
+		fmt.Printf("\n%s %s%sNo resources found to backup in namespace '%s'%s\n",
+			utils.InfoEmoji, utils.Yellow, utils.Bold, namespace, utils.Reset)
 	}
 
 	// Exit with error code if there were errors
 	if errorCount > 0 {
-		fmt.Printf("Completed with %d errors\n", errorCount)
+		fmt.Printf("%s %s%sCompleted with %d errors%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, errorCount, utils.Reset)
 		os.Exit(1)
 	}
 }
