@@ -15,10 +15,13 @@ A Go application that backs up Kubernetes resources from a specified namespace b
 
 ## Features
 
-- Exports all standard Kubernetes resources from a namespace
+- Exports all standard Kubernetes resources from a namespace or all namespaces
+- Uses the current namespace from kubeconfig when no namespace is specified
 - Organizes backups by resource kind in separate directories
 - Thoroughly cleans manifests by removing server-side and cluster-specific fields
 - Timestamp-based backup directories
+- Colorful and descriptive console output with emojis
+- Resource type filtering for selective backups
 
 ## Installation
 
@@ -58,8 +61,14 @@ docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --
 # Show version information
 ./kbak --version
 
-# Backup a namespace using the current kubeconfig
+# Backup resources from your current namespace (from kubeconfig)
+./kbak
+
+# Backup a specific namespace
 ./kbak --namespace your-namespace
+
+# Backup all namespaces
+./kbak --all-namespaces
 
 # Specify a custom kubeconfig file
 ./kbak --namespace your-namespace --kubeconfig /path/to/kubeconfig
@@ -72,6 +81,9 @@ docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --
 
 # Backup only pods and deployments
 ./kbak --namespace your-namespace --pod --deployment --all-resources=false
+
+# Backup resources with verbose output
+./kbak --namespace your-namespace --verbose
 ```
 
 ### Resource Type Filtering
@@ -111,8 +123,7 @@ The tool automatically backs up the following resource types:
 
 ## Output Structure
 
-Backups are organized as follows:
-
+### Single Namespace Backup
 ```
 02Jan2006-15:04/
 └── namespace/
@@ -124,6 +135,24 @@ Backups are organized as follows:
     │   └── ...
     ├── Service/
     │   ├── my-service.yaml
+    │   └── ...
+    └── ...
+```
+
+### All Namespaces Backup
+```
+02Jan2006-15:04/
+└── all-namespaces/
+    ├── namespace1/
+    │   ├── Pod/
+    │   │   ├── my-pod.yaml
+    │   │   └── ...
+    │   ├── Deployment/
+    │   │   └── ...
+    │   └── ...
+    ├── namespace2/
+    │   ├── Pod/
+    │   │   └── ...
     │   └── ...
     └── ...
 ```

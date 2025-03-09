@@ -173,8 +173,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		// Ensure the filename is valid for the filesystem
 		safeName := ensureValidFilename(name)
 		if safeName != name && verbose {
-			fmt.Printf("%s%sResource name %q sanitized to %q for filesystem compatibility%s\n",
-				utils.InfoEmoji, utils.BrightBlue, name, safeName, utils.Reset)
+			fmt.Printf("%sResource name %q sanitized to %q for filesystem compatibility%s\n",
+				utils.BrightBlue, name, safeName, utils.Reset)
 		}
 
 		// Remove cluster-specific and runtime fields

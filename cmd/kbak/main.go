@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"github.com/rogosprojects/kbak/pkg/backup"
 	"github.com/rogosprojects/kbak/pkg/client"
 	"github.com/rogosprojects/kbak/pkg/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
 
@@ -48,7 +51,7 @@ func main() {
 	var resFlags resourceFlags
 
 	// Basic flags
-	flag.StringVar(&namespace, "namespace", "", "Namespace to backup (required unless --all-namespaces is used)")
+	flag.StringVar(&namespace, "namespace", "", "Namespace to backup (uses current namespace from kubeconfig if not specified)")
 	flag.StringVar(&outputDir, "output", "backups", "Output directory for backup files")
 	flag.BoolVar(&verbose, "verbose", false, "Show verbose output")
 	flag.BoolVar(&showVersion, "version", false, "Show version information and exit")
@@ -80,17 +83,9 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("%s %skbak%s version %s %s%s\n",
+		fmt.Printf("%s %skbak%s version %s%s%s\n",
 			utils.K8sEmoji, utils.Bold, utils.Reset, utils.Cyan, Version, utils.Reset)
 		os.Exit(0)
-	}
-
-	// Validate namespace requirements
-	if namespace == "" && !allNamespaces {
-		fmt.Printf("%s %s%sError: either --namespace or --all-namespaces flag is required%s\n",
-			utils.ErrorEmoji, utils.Red, utils.Bold, utils.Reset)
-		flag.Usage()
-		os.Exit(1)
 	}
 
 	if allNamespaces && namespace != "" {
@@ -107,13 +102,92 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Handle all-namespaces case (not implemented yet, just a placeholder)
+	// If namespace is not specified and not using all-namespaces, get the current namespace from kubeconfig
+	if namespace == "" && !allNamespaces {
+		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		loadingRules.ExplicitPath = kubeconfig
+		configOverrides := &clientcmd.ConfigOverrides{}
+		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+		currentNamespace, _, err := kubeConfig.Namespace()
+		if err != nil {
+			fmt.Printf("%s %s%sError getting current namespace: %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
+			os.Exit(1)
+		}
+		namespace = currentNamespace
+		if verbose {
+			fmt.Printf(" %sUsing current namespace: %s%s\n",
+				utils.Cyan, namespace, utils.Reset)
+		}
+	}
+
+	// Handle all-namespaces case
 	if allNamespaces {
-		fmt.Printf("%s %s%sError: --all-namespaces is not implemented yet%s\n",
-			utils.ErrorEmoji, utils.Red, utils.Bold, utils.Reset)
-		os.Exit(1)
-		// Here we would get a list of all namespaces and iterate through them
-		// This feature is left for future implementation
+		// Get all namespaces
+		namespaces, err := k8sClient.Clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			fmt.Printf("%s %s%sError listing namespaces: %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
+			os.Exit(1)
+		}
+
+		// Create parent backup directory
+		timestamp := time.Now().Format("02Jan2006-15:04")
+		parentBackupDir := filepath.Join(outputDir, timestamp, "all-namespaces")
+
+		if err := os.MkdirAll(parentBackupDir, 0755); err != nil {
+			fmt.Printf("%s %s%sError creating output directory: %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
+			os.Exit(1)
+		}
+
+		fmt.Printf("%s %s%sStarting backup of all namespaces to '%s'%s\n\n",
+			utils.StartEmoji, utils.Blue, utils.Bold, parentBackupDir, utils.Reset)
+
+		totalResourceCount := 0
+		totalErrorCount := 0
+
+		// Process each namespace
+		for _, ns := range namespaces.Items {
+			nsName := ns.Name
+			nsBackupDir := filepath.Join(parentBackupDir, nsName)
+
+			if err := os.MkdirAll(nsBackupDir, 0755); err != nil {
+				fmt.Printf("%s %s%sError creating directory for namespace %s: %v%s\n",
+					utils.ErrorEmoji, utils.Red, utils.Bold, nsName, err, utils.Reset)
+				totalErrorCount++
+				continue
+			}
+
+			// Prepare resource type filter
+			selectedTypes := buildResourceTypeMap(resFlags)
+
+			fmt.Printf("%sProcessing namespace: %s%s\n",
+				utils.Blue, nsName, utils.Reset)
+
+			// Perform backup for this namespace
+			resourceCount, errorCount := backup.PerformBackup(k8sClient, nsName, nsBackupDir, selectedTypes, verbose)
+
+			totalResourceCount += resourceCount
+			totalErrorCount += errorCount
+		}
+
+		if totalResourceCount > 0 {
+			fmt.Printf("\n%s %s%sBackup completed successfully to %s (%d resources total across all namespaces)%s\n",
+				utils.SuccessEmoji, utils.Green, utils.Bold, parentBackupDir, totalResourceCount, utils.Reset)
+		} else {
+			fmt.Printf("\n%s %s%sNo resources found to backup in any namespace%s\n",
+				utils.WarningEmoji, utils.Yellow, utils.Bold, utils.Reset)
+		}
+
+		// Exit with error code if there were errors
+		if totalErrorCount > 0 {
+			fmt.Printf("%s %s%sCompleted with %d errors%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, totalErrorCount, utils.Reset)
+			os.Exit(1)
+		}
+
+		os.Exit(0)
 	}
 
 	// Create output directory with timestamp
@@ -145,7 +219,7 @@ func main() {
 			utils.SuccessEmoji, utils.Green, utils.Bold, backupDir, resourceCount, utils.Reset)
 	} else {
 		fmt.Printf("\n%s %s%sNo resources found to backup in namespace '%s'%s\n",
-			utils.InfoEmoji, utils.Yellow, utils.Bold, namespace, utils.Reset)
+			utils.WarningEmoji, utils.Yellow, utils.Bold, namespace, utils.Reset)
 	}
 
 	// Exit with error code if there were errors

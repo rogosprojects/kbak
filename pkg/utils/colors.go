@@ -30,8 +30,8 @@ const (
 
 // Emojis for different message types
 const (
-	InfoEmoji    = "ℹ️"
-	SuccessEmoji = "✅"
+	InfoEmoji    = "ℹ "
+	SuccessEmoji = "✔ "
 	WarningEmoji = "⚠️"
 	ErrorEmoji   = "❌"
 	BackupEmoji  = "💾"
