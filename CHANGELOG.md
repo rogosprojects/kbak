@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.10] - 2025-03-09
+### :sparkles: New Features
+- [`085c7b7`](https://github.com/rogosprojects/kbak/commit/085c7b7917956592fa84f0b06f2c52c44a1d243d) - enhance output messages with colored formatting and emojis for better visibility *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`e4417b0`](https://github.com/rogosprojects/kbak/commit/e4417b0715d7d3e8519ed2cea72d0a05c13bf2f7) - add current namespace retrieval and all-namespaces backup functionality *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+
 ## [v0.1.9] - 2025-03-06
 ### :sparkles: New Features
 - Add resource type filtering with flags for selectively backing up specific resource types
@@ -61,3 +67,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.6]: https://github.com/rogosprojects/kbak/compare/v0.1.5...v0.1.6
 [v0.1.7]: https://github.com/rogosprojects/kbak/compare/v0.1.6...v0.1.7
 [v0.1.8]: https://github.com/rogosprojects/kbak/compare/v0.1.7...v0.1.8
+[v0.1.10]: https://github.com/rogosprojects/kbak/compare/v0.1.9...v0.1.10
