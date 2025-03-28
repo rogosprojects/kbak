@@ -131,7 +131,7 @@ main() {
       ((TOTAL_RESOURCES++))
 
       # Validate each resource with kubectl dry-run
-      if kubectl apply -f "${FILE}" --dry-run=client &> /tmp/kbak_test_result; then
+      if kubectl apply -f "${FILE}" --dry-run=server &> /tmp/kbak_test_result; then
         print_success "Resource validated: ${RESOURCE_TYPE}/${RESOURCE_NAME}"
         ((SUCCESSFUL_RESOURCES++))
       else
@@ -160,7 +160,7 @@ main() {
     fi
 
     # Validate entire resource type directory
-    if kubectl apply -f "${DIR}" --dry-run=client &> /tmp/kbak_test_result; then
+    if kubectl apply -f "${DIR}" --dry-run=server &> /tmp/kbak_test_result; then
       print_success "Resource type validated: ${RESOURCE_TYPE}"
     else
       print_error "Resource type validation failed: ${RESOURCE_TYPE}"
