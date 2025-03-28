@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.1.11] - 2025-03-28
+### :sparkles: New Features
+- [`527ea2e`](https://github.com/rogosprojects/kbak/commit/527ea2e39f560aed98f7ab91fbbcab63aaa0b65f) - extend cleaner utility with support for StatefulSet, DaemonSet, ReplicaSet, Job, CronJob, Ingress, PodDisruptionBudget, Role, ClusterRole, RoleBinding, and ClusterRoleBinding *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`ead54c5`](https://github.com/rogosprojects/kbak/commit/ead54c54c3173f439e780871acbeb4c85385447d) - add Windows support to release workflow for cross-platform builds *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+### :bug: Bug Fixes
+- [`1a22a3c`](https://github.com/rogosprojects/kbak/commit/1a22a3cfae0f407b88089da8dca71dde1fc4a957) - change kubectl dry-run mode from client to server for resource validation *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+
 ## [v0.1.10] - 2025-03-09
 ### :sparkles: New Features
 - [`085c7b7`](https://github.com/rogosprojects/kbak/commit/085c7b7917956592fa84f0b06f2c52c44a1d243d) - enhance output messages with colored formatting and emojis for better visibility *(commit by [@rogosprojects](https://github.com/rogosprojects))*
@@ -68,3 +77,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.7]: https://github.com/rogosprojects/kbak/compare/v0.1.6...v0.1.7
 [v0.1.8]: https://github.com/rogosprojects/kbak/compare/v0.1.7...v0.1.8
 [v0.1.10]: https://github.com/rogosprojects/kbak/compare/v0.1.9...v0.1.10
+[v0.1.11]: https://github.com/rogosprojects/kbak/compare/v0.1.10...v0.1.11
