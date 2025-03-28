@@ -4,7 +4,11 @@ import (
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -19,6 +23,46 @@ func CleanObject(obj interface{}) {
 	// Deployment
 	case *appsv1.Deployment:
 		CleanDeployment(typedObj)
+
+	// StatefulSet
+	case *appsv1.StatefulSet:
+		CleanStatefulSet(typedObj)
+
+	// DaemonSet
+	case *appsv1.DaemonSet:
+		CleanDaemonSet(typedObj)
+
+	// ReplicaSet
+	case *appsv1.ReplicaSet:
+		CleanReplicaSet(typedObj)
+
+	// Job
+	case *batchv1.Job:
+		CleanJob(typedObj)
+
+	// CronJob
+	case *batchv1.CronJob:
+		CleanCronJob(typedObj)
+
+	// Ingress
+	case *networkingv1.Ingress:
+		CleanIngress(typedObj)
+
+	// PodDisruptionBudget
+	case *policyv1.PodDisruptionBudget:
+		CleanPDB(typedObj)
+
+	// Role and ClusterRole
+	case *rbacv1.Role:
+		CleanRole(typedObj)
+	case *rbacv1.ClusterRole:
+		CleanClusterRole(typedObj)
+
+	// RoleBinding and ClusterRoleBinding
+	case *rbacv1.RoleBinding:
+		CleanRoleBinding(typedObj)
+	case *rbacv1.ClusterRoleBinding:
+		CleanClusterRoleBinding(typedObj)
 
 	// Service
 	case *v1.Service:
@@ -209,7 +253,6 @@ func inferAPIVersionAndKind(obj map[string]interface{}) {
 // IsSystemAnnotation checks if an annotation is system-managed
 func IsSystemAnnotation(key string) bool {
 	systemPrefixes := []string{
-		"kubernetes.io/",
 		"k8s.io/",
 		"control-plane.alpha.kubernetes.io/",
 		"app.kubernetes.io/",
@@ -396,7 +439,6 @@ func CleanMetadata(meta *metav1.ObjectMeta) {
 	meta.DeletionGracePeriodSeconds = nil
 	meta.Generation = 0
 	meta.ResourceVersion = ""
-	meta.SelfLink = ""
 	meta.UID = ""
 	meta.ManagedFields = nil
 
@@ -410,18 +452,203 @@ func CleanMetadata(meta *metav1.ObjectMeta) {
 	meta.Name = name
 	meta.Namespace = namespace
 	meta.Labels = labels
-
 	// Clean annotations but keep user ones
-	if annotations != nil {
-		for k := range annotations {
-			if IsSystemAnnotation(k) {
-				delete(annotations, k)
+	// if annotations != nil {
+	// 	for k := range annotations {
+	// 		if IsSystemAnnotation(k) {
+	// 			delete(annotations, k)
+	// 		}
+	// 	}
+	if len(annotations) == 0 {
+		meta.Annotations = nil
+	} else {
+		meta.Annotations = annotations
+	}
+	// }
+}
+
+// CleanStatefulSet removes server-side fields from a StatefulSet
+func CleanStatefulSet(statefulset *appsv1.StatefulSet) {
+	// Remove status
+	statefulset.Status = appsv1.StatefulSetStatus{}
+
+	// Clean metadata
+	CleanMetadata(&statefulset.ObjectMeta)
+
+	// Clean template metadata but preserve essential fields
+	CleanMetadata(&statefulset.Spec.Template.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	statefulset.APIVersion = "apps/v1"
+	statefulset.Kind = "StatefulSet"
+
+	// Ensure selector is preserved (it's required for statefulsets)
+	if statefulset.Spec.Selector == nil || len(statefulset.Spec.Selector.MatchLabels) == 0 {
+		// If no selector, create one that matches template labels
+		if statefulset.Spec.Template.Labels != nil && len(statefulset.Spec.Template.Labels) > 0 {
+			if statefulset.Spec.Selector == nil {
+				statefulset.Spec.Selector = &metav1.LabelSelector{}
 			}
-		}
-		if len(annotations) == 0 {
-			meta.Annotations = nil
-		} else {
-			meta.Annotations = annotations
+			statefulset.Spec.Selector.MatchLabels = statefulset.Spec.Template.Labels
 		}
 	}
+}
+
+// CleanDaemonSet removes server-side fields from a DaemonSet
+func CleanDaemonSet(daemonset *appsv1.DaemonSet) {
+	// Remove status
+	daemonset.Status = appsv1.DaemonSetStatus{}
+
+	// Clean metadata
+	CleanMetadata(&daemonset.ObjectMeta)
+
+	// Clean template metadata but preserve essential fields
+	CleanMetadata(&daemonset.Spec.Template.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	daemonset.APIVersion = "apps/v1"
+	daemonset.Kind = "DaemonSet"
+
+	// Ensure selector is preserved (it's required for daemonsets)
+	if daemonset.Spec.Selector == nil || len(daemonset.Spec.Selector.MatchLabels) == 0 {
+		// If no selector, create one that matches template labels
+		if daemonset.Spec.Template.Labels != nil && len(daemonset.Spec.Template.Labels) > 0 {
+			if daemonset.Spec.Selector == nil {
+				daemonset.Spec.Selector = &metav1.LabelSelector{}
+			}
+			daemonset.Spec.Selector.MatchLabels = daemonset.Spec.Template.Labels
+		}
+	}
+}
+
+// CleanReplicaSet removes server-side fields from a ReplicaSet
+func CleanReplicaSet(replicaset *appsv1.ReplicaSet) {
+	// Remove status
+	replicaset.Status = appsv1.ReplicaSetStatus{}
+
+	// Clean metadata
+	CleanMetadata(&replicaset.ObjectMeta)
+
+	// Clean template metadata but preserve essential fields
+	CleanMetadata(&replicaset.Spec.Template.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	replicaset.APIVersion = "apps/v1"
+	replicaset.Kind = "ReplicaSet"
+
+	// Ensure selector is preserved (it's required for replicasets)
+	if replicaset.Spec.Selector == nil || len(replicaset.Spec.Selector.MatchLabels) == 0 {
+		// If no selector, create one that matches template labels
+		if replicaset.Spec.Template.Labels != nil && len(replicaset.Spec.Template.Labels) > 0 {
+			if replicaset.Spec.Selector == nil {
+				replicaset.Spec.Selector = &metav1.LabelSelector{}
+			}
+			replicaset.Spec.Selector.MatchLabels = replicaset.Spec.Template.Labels
+		}
+	}
+}
+
+// CleanJob removes server-side fields from a Job
+func CleanJob(job *batchv1.Job) {
+	// Remove status
+	job.Status = batchv1.JobStatus{}
+
+	// Clean metadata
+	CleanMetadata(&job.ObjectMeta)
+
+	// Clean template metadata but preserve essential fields
+	CleanMetadata(&job.Spec.Template.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	job.APIVersion = "batch/v1"
+	job.Kind = "Job"
+
+	// Reset fields that are typically server-assigned
+	job.Spec.Selector = nil // Selector is automatically generated for Jobs
+}
+
+// CleanCronJob removes server-side fields from a CronJob
+func CleanCronJob(cronjob *batchv1.CronJob) {
+	// Remove status
+	cronjob.Status = batchv1.CronJobStatus{}
+
+	// Clean metadata
+	CleanMetadata(&cronjob.ObjectMeta)
+
+	// Clean template metadata but preserve essential fields
+	CleanMetadata(&cronjob.Spec.JobTemplate.ObjectMeta)
+	CleanMetadata(&cronjob.Spec.JobTemplate.Spec.Template.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	cronjob.APIVersion = "batch/v1"
+	cronjob.Kind = "CronJob"
+
+	// Reset fields that are typically server-assigned
+	cronjob.Spec.JobTemplate.Spec.Selector = nil // Selector is automatically generated for Jobs
+}
+
+// CleanIngress removes server-side fields from an Ingress
+func CleanIngress(ingress *networkingv1.Ingress) {
+	// Remove status
+	ingress.Status = networkingv1.IngressStatus{}
+
+	// Clean metadata
+	CleanMetadata(&ingress.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	ingress.APIVersion = "networking.k8s.io/v1"
+	ingress.Kind = "Ingress"
+}
+
+// CleanPDB removes server-side fields from a PodDisruptionBudget
+func CleanPDB(pdb *policyv1.PodDisruptionBudget) {
+	// Remove status
+	pdb.Status = policyv1.PodDisruptionBudgetStatus{}
+
+	// Clean metadata
+	CleanMetadata(&pdb.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	pdb.APIVersion = "policy/v1"
+	pdb.Kind = "PodDisruptionBudget"
+}
+
+// CleanRole removes server-side fields from a Role
+func CleanRole(role *rbacv1.Role) {
+	// Clean metadata
+	CleanMetadata(&role.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	role.APIVersion = "rbac.authorization.k8s.io/v1"
+	role.Kind = "Role"
+}
+
+// CleanClusterRole removes server-side fields from a ClusterRole
+func CleanClusterRole(clusterRole *rbacv1.ClusterRole) {
+	// Clean metadata
+	CleanMetadata(&clusterRole.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	clusterRole.APIVersion = "rbac.authorization.k8s.io/v1"
+	clusterRole.Kind = "ClusterRole"
+}
+
+// CleanRoleBinding removes server-side fields from a RoleBinding
+func CleanRoleBinding(roleBinding *rbacv1.RoleBinding) {
+	// Clean metadata
+	CleanMetadata(&roleBinding.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	roleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
+	roleBinding.Kind = "RoleBinding"
+}
+
+// CleanClusterRoleBinding removes server-side fields from a ClusterRoleBinding
+func CleanClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding) {
+	// Clean metadata
+	CleanMetadata(&clusterRoleBinding.ObjectMeta)
+
+	// Set API version and kind for valid Kubernetes manifests
+	clusterRoleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
+	clusterRoleBinding.Kind = "ClusterRoleBinding"
 }
