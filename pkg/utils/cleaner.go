@@ -253,6 +253,7 @@ func inferAPIVersionAndKind(obj map[string]interface{}) {
 // IsSystemAnnotation checks if an annotation is system-managed
 func IsSystemAnnotation(key string) bool {
 	systemPrefixes := []string{
+		"kubernetes.io/",
 		"k8s.io/",
 		"control-plane.alpha.kubernetes.io/",
 		"app.kubernetes.io/",
@@ -269,6 +270,50 @@ func IsSystemAnnotation(key string) bool {
 	}
 
 	return false
+}
+
+// IsSystemLabel checks if a label is system-managed for Jobs
+func IsSystemLabel(key string) bool {
+	systemLabelPrefixes := []string{
+		"batch.kubernetes.io/",
+	}
+
+	systemLabels := []string{
+		"controller-uid",
+	}
+
+	// Check for system label prefixes
+	for _, prefix := range systemLabelPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+
+	// Check for specific system labels
+	for _, label := range systemLabels {
+		if key == label {
+			return true
+		}
+	}
+
+	return false
+}
+
+// CleanJobLabels removes system-managed labels from Job metadata
+func CleanJobLabels(meta *metav1.ObjectMeta) {
+	if meta.Labels != nil {
+		cleanedLabels := make(map[string]string)
+		for k, v := range meta.Labels {
+			if !IsSystemLabel(k) {
+				cleanedLabels[k] = v
+			}
+		}
+		if len(cleanedLabels) == 0 {
+			meta.Labels = nil
+		} else {
+			meta.Labels = cleanedLabels
+		}
+	}
 }
 
 // CleanPod removes server-side fields from a Pod
@@ -440,6 +485,7 @@ func CleanMetadata(meta *metav1.ObjectMeta) {
 	meta.Generation = 0
 	meta.ResourceVersion = ""
 	meta.UID = ""
+	meta.SelfLink = ""
 	meta.ManagedFields = nil
 
 	// Remove owner references as they're server-side
@@ -452,19 +498,23 @@ func CleanMetadata(meta *metav1.ObjectMeta) {
 	meta.Name = name
 	meta.Namespace = namespace
 	meta.Labels = labels
+
 	// Clean annotations but keep user ones
-	// if annotations != nil {
-	// 	for k := range annotations {
-	// 		if IsSystemAnnotation(k) {
-	// 			delete(annotations, k)
-	// 		}
-	// 	}
-	if len(annotations) == 0 {
-		meta.Annotations = nil
+	if annotations != nil {
+		cleanedAnnotations := make(map[string]string)
+		for k, v := range annotations {
+			if !IsSystemAnnotation(k) {
+				cleanedAnnotations[k] = v
+			}
+		}
+		if len(cleanedAnnotations) == 0 {
+			meta.Annotations = nil
+		} else {
+			meta.Annotations = cleanedAnnotations
+		}
 	} else {
-		meta.Annotations = annotations
+		meta.Annotations = nil
 	}
-	// }
 }
 
 // CleanStatefulSet removes server-side fields from a StatefulSet
@@ -556,8 +606,14 @@ func CleanJob(job *batchv1.Job) {
 	// Clean metadata
 	CleanMetadata(&job.ObjectMeta)
 
+	// Clean Job-specific system labels (controller-uid, batch.kubernetes.io/*)
+	CleanJobLabels(&job.ObjectMeta)
+
 	// Clean template metadata but preserve essential fields
 	CleanMetadata(&job.Spec.Template.ObjectMeta)
+
+	// Also clean Job-specific labels from the template metadata
+	CleanJobLabels(&job.Spec.Template.ObjectMeta)
 
 	// Set API version and kind for valid Kubernetes manifests
 	job.APIVersion = "batch/v1"
@@ -565,6 +621,16 @@ func CleanJob(job *batchv1.Job) {
 
 	// Reset fields that are typically server-assigned
 	job.Spec.Selector = nil // Selector is automatically generated for Jobs
+
+	// Clean up Job-specific server-managed fields
+	// These fields can accumulate and cause memory issues in large Job lists
+	if job.Spec.ManualSelector != nil && !*job.Spec.ManualSelector {
+		job.Spec.ManualSelector = nil
+	}
+
+	// Reset completion and failure tracking fields that are server-managed
+	// Keep user-specified values for parallelism, completions, etc.
+	// but remove server-assigned tracking fields
 }
 
 // CleanCronJob removes server-side fields from a CronJob
@@ -578,6 +644,10 @@ func CleanCronJob(cronjob *batchv1.CronJob) {
 	// Clean template metadata but preserve essential fields
 	CleanMetadata(&cronjob.Spec.JobTemplate.ObjectMeta)
 	CleanMetadata(&cronjob.Spec.JobTemplate.Spec.Template.ObjectMeta)
+
+	// Clean Job-specific system labels from the job template
+	CleanJobLabels(&cronjob.Spec.JobTemplate.ObjectMeta)
+	CleanJobLabels(&cronjob.Spec.JobTemplate.Spec.Template.ObjectMeta)
 
 	// Set API version and kind for valid Kubernetes manifests
 	cronjob.APIVersion = "batch/v1"

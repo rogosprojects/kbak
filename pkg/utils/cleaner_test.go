@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -642,6 +643,227 @@ func TestCleanServiceAccount(t *testing.T) {
 	}
 	if sa.Kind != "ServiceAccount" {
 		t.Errorf("Kind not set correctly: got %q, want %q", sa.Kind, "ServiceAccount")
+	}
+}
+
+func TestIsSystemLabel(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		expected bool
+	}{
+		{"controller-uid label", "controller-uid", true},
+		{"batch.kubernetes.io prefix", "batch.kubernetes.io/job-name", true},
+		{"batch.kubernetes.io/controller-uid", "batch.kubernetes.io/controller-uid", true},
+		{"custom label", "app", false},
+		{"custom label with value", "custom.label/value", false},
+		{"empty string", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := IsSystemLabel(tt.key)
+			if got != tt.expected {
+				t.Errorf("IsSystemLabel(%q) = %v, want %v", tt.key, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCleanJobLabels(t *testing.T) {
+	meta := &metav1.ObjectMeta{
+		Name: "test-job",
+		Labels: map[string]string{
+			"app":                                "test-job",
+			"controller-uid":                     "12345-abcde",
+			"batch.kubernetes.io/job-name":       "test-job",
+			"batch.kubernetes.io/controller-uid": "67890-fghij",
+			"custom.label/keep":                  "this-value",
+		},
+	}
+
+	CleanJobLabels(meta)
+
+	expectedLabels := map[string]string{
+		"app":               "test-job",
+		"custom.label/keep": "this-value",
+	}
+
+	if !reflect.DeepEqual(meta.Labels, expectedLabels) {
+		t.Errorf("CleanJobLabels() labels = %v, want %v", meta.Labels, expectedLabels)
+	}
+
+	// Test with no labels
+	emptyMeta := &metav1.ObjectMeta{Name: "test"}
+	CleanJobLabels(emptyMeta)
+	if emptyMeta.Labels != nil {
+		t.Errorf("CleanJobLabels() with no labels should remain nil, got %v", emptyMeta.Labels)
+	}
+
+	// Test with only system labels
+	systemOnlyMeta := &metav1.ObjectMeta{
+		Name: "test",
+		Labels: map[string]string{
+			"controller-uid":               "12345",
+			"batch.kubernetes.io/job-name": "test",
+		},
+	}
+	CleanJobLabels(systemOnlyMeta)
+	if systemOnlyMeta.Labels != nil {
+		t.Errorf("CleanJobLabels() with only system labels should be nil, got %v", systemOnlyMeta.Labels)
+	}
+}
+
+func TestCleanJob(t *testing.T) {
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-job",
+			Namespace:       "test-namespace",
+			ResourceVersion: "123",
+			UID:             "job-uid",
+			Annotations: map[string]string{
+				"custom/annotation":        "keep-this",
+				"kubernetes.io/annotation": "remove-this",
+			},
+			Labels: map[string]string{
+				"app":                          "test-job",
+				"controller-uid":               "12345-abcde",
+				"batch.kubernetes.io/job-name": "test-job",
+				"custom.label/keep":            "this-value",
+			},
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":                          "test-job",
+						"controller-uid":               "template-12345",
+						"batch.kubernetes.io/job-name": "test-job-template",
+						"custom.template/keep":         "template-value",
+					},
+					ResourceVersion: "456",
+					UID:             "template-uid",
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+				},
+			},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "test-job",
+				},
+			},
+		},
+		Status: batchv1.JobStatus{
+			Active:    1,
+			Succeeded: 0,
+			Failed:    0,
+		},
+	}
+
+	// Clean the Job
+	CleanJob(job)
+
+	// Verify core fields are preserved
+	if job.Name != "test-job" {
+		t.Errorf("Job name was changed: got %q, want %q", job.Name, "test-job")
+	}
+	if job.Namespace != "test-namespace" {
+		t.Errorf("Job namespace was changed: got %q, want %q", job.Namespace, "test-namespace")
+	}
+
+	// Verify labels are cleaned (system labels removed, user labels preserved)
+	expectedLabels := map[string]string{
+		"app":               "test-job",
+		"custom.label/keep": "this-value",
+	}
+	if !reflect.DeepEqual(job.Labels, expectedLabels) {
+		t.Errorf("Job labels were not cleaned correctly: got %v, want %v", job.Labels, expectedLabels)
+	}
+
+	// Verify template labels are also cleaned
+	expectedTemplateLabels := map[string]string{
+		"app":                  "test-job",
+		"custom.template/keep": "template-value",
+	}
+	if !reflect.DeepEqual(job.Spec.Template.Labels, expectedTemplateLabels) {
+		t.Errorf("Job template labels were not cleaned correctly: got %v, want %v", job.Spec.Template.Labels, expectedTemplateLabels)
+	}
+
+	// Verify template spec is preserved
+	if job.Spec.Template.Spec.RestartPolicy != corev1.RestartPolicyNever {
+		t.Errorf("Template RestartPolicy was changed: got %v, want %v",
+			job.Spec.Template.Spec.RestartPolicy, corev1.RestartPolicyNever)
+	}
+
+	// Verify runtime fields are cleaned
+	if job.ResourceVersion != "" {
+		t.Errorf("ResourceVersion not cleared: got %q", job.ResourceVersion)
+	}
+	if string(job.UID) != "" {
+		t.Errorf("UID not cleared: got %q", job.UID)
+	}
+
+	// Verify template metadata is cleaned
+	if job.Spec.Template.ResourceVersion != "" {
+		t.Errorf("Template ResourceVersion not cleared: got %q", job.Spec.Template.ResourceVersion)
+	}
+	if string(job.Spec.Template.UID) != "" {
+		t.Errorf("Template UID not cleared: got %q", job.Spec.Template.UID)
+	}
+
+	// Verify annotations are cleaned properly
+	expectedAnnotations := map[string]string{"custom/annotation": "keep-this"}
+	if !reflect.DeepEqual(job.Annotations, expectedAnnotations) {
+		t.Errorf("Annotations not properly cleaned: got %v, want %v", job.Annotations, expectedAnnotations)
+	}
+
+	// Verify status is cleaned
+	if !reflect.DeepEqual(job.Status, batchv1.JobStatus{}) {
+		t.Errorf("Status not cleared: got %v", job.Status)
+	}
+
+	// Verify selector is cleared (Jobs auto-generate selectors)
+	if job.Spec.Selector != nil {
+		t.Errorf("Selector not cleared: got %v", job.Spec.Selector)
+	}
+
+	// Verify API version and kind are set properly
+	if job.APIVersion != "batch/v1" {
+		t.Errorf("APIVersion not set correctly: got %q, want %q", job.APIVersion, "batch/v1")
+	}
+	if job.Kind != "Job" {
+		t.Errorf("Kind not set correctly: got %q, want %q", job.Kind, "Job")
+	}
+
+	// Test Job with ManualSelector set to false (should be cleaned)
+	jobWithManualSelector := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "job-with-manual-selector",
+		},
+		Spec: batchv1.JobSpec{
+			ManualSelector: func() *bool { b := false; return &b }(),
+		},
+	}
+
+	CleanJob(jobWithManualSelector)
+	if jobWithManualSelector.Spec.ManualSelector != nil {
+		t.Errorf("ManualSelector should be cleared when set to false, got %v", *jobWithManualSelector.Spec.ManualSelector)
+	}
+
+	// Test Job with ManualSelector set to true (should be preserved)
+	jobWithManualSelectorTrue := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "job-with-manual-selector-true",
+		},
+		Spec: batchv1.JobSpec{
+			ManualSelector: func() *bool { b := true; return &b }(),
+		},
+	}
+
+	CleanJob(jobWithManualSelectorTrue)
+	if jobWithManualSelectorTrue.Spec.ManualSelector == nil || !*jobWithManualSelectorTrue.Spec.ManualSelector {
+		t.Errorf("ManualSelector should be preserved when set to true")
 	}
 }
 
