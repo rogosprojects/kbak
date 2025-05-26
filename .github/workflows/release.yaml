@@ -6,7 +6,19 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+*"
 
 jobs:
+  run-tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.21
+      - name: Run tests
+        run: go test ./...
   update-changelog:
+    needs: run-tests
     name: Create release
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +41,7 @@ jobs:
           file_pattern: CHANGELOG.md
 
   releases-matrix:
+    needs: run-tests
     name: Release Go Binary
     runs-on: ubuntu-latest
     strategy:
