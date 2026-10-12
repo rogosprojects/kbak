@@ -1,0 +1,236 @@
+# One object (or more) per kind kbak supports, including the edge cases that
+# break naive restores. Apply into an empty namespace:
+#   kubectl create ns kbak-e2e && kubectl -n kbak-e2e apply -f e2e-fixtures.yaml
+# Needs a default StorageClass for the PVC and the StatefulSet.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels: {app: web}
+  annotations: {team/owner: platform}
+data:
+  key: value
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+type: Opaque
+stringData:
+  password: s3cr3t
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-sa
+---
+# Legacy long-lived token: the token controller fills in data and the uid annotation
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-sa-token
+  annotations:
+    kubernetes.io/service-account.name: app-sa
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: reader
+rules:
+- apiGroups: [""]
+  resources: [configmaps]
+  verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: reader
+subjects:
+- kind: ServiceAccount
+  name: app-sa
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels: {app: web}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+      annotations: {team/scrape: "true"}
+    spec:
+      serviceAccountName: app-sa
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - {name: http, containerPort: 80}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+spec:
+  selector: {app: web}
+  ports:
+  - {name: http, port: 80, targetPort: http}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-headless
+spec:
+  clusterIP: None
+  selector: {app: db}
+  ports:
+  - {name: http, port: 80}
+---
+# User-set fields that must survive a restore
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-lb
+spec:
+  type: LoadBalancer
+  selector: {app: web}
+  externalIPs: [192.0.2.10]
+  loadBalancerSourceRanges: [203.0.113.0/24]
+  externalTrafficPolicy: Local
+  ports:
+  - {name: http, port: 80, targetPort: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: web.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port: {name: http}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: web-headless
+  replicas: 1
+  selector:
+    matchLabels: {app: db}
+  template:
+    metadata:
+      labels: {app: db}
+    spec:
+      containers:
+      - name: db
+        image: busybox:1.36
+        command: [sh, -c, "sleep 1d"]
+        volumeMounts:
+        - {name: data, mountPath: /data}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests: {storage: 64Mi}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agent
+spec:
+  selector:
+    matchLabels: {app: agent}
+  template:
+    metadata:
+      labels: {app: agent}
+    spec:
+      containers:
+      - name: agent
+        image: busybox:1.36
+        command: [sh, -c, "sleep 1d"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: standalone-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 64Mi}
+---
+# Bare pod (no controller) that mounts the PVC, so the PVC binds
+apiVersion: v1
+kind: Pod
+metadata:
+  name: standalone
+  labels: {app: standalone}
+spec:
+  containers:
+  - name: main
+    image: busybox:1.36
+    command: [sh, -c, "sleep 1d"]
+    volumeMounts:
+    - {name: data, mountPath: /data}
+  volumes:
+  - name: data
+    persistentVolumeClaim: {claimName: standalone-data}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: once
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: main
+        image: busybox:1.36
+        command: [sh, -c, "echo done"]
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tick
+spec:
+  schedule: "* * * * *"
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: main
+            image: busybox:1.36
+            command: [sh, -c, "echo tick"]
+---
+# Needs the Route CRD on non-OpenShift clusters
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: web
+spec:
+  host: web.example.com
+  to: {kind: Service, name: web}

@@ -24,6 +24,14 @@ func TestIsSystemAnnotation(t *testing.T) {
 		{"app.kubernetes.io prefix", "app.kubernetes.io/name", true},
 		{"kubectl.kubernetes.io prefix", "kubectl.kubernetes.io/last-applied-configuration", true},
 		{"meta.helm.sh prefix", "meta.helm.sh/release-name", true},
+		{"service account uid on token secret", "kubernetes.io/service-account.uid", true},
+		{"PV binding state", "pv.kubernetes.io/bind-completed", true},
+		{"PVC selected node", "volume.kubernetes.io/selected-node", true},
+		{"PVC provisioner", "volume.beta.kubernetes.io/storage-provisioner", true},
+		{"user-set legacy ingress class", "kubernetes.io/ingress.class", false},
+		{"user-set service account of token secret", "kubernetes.io/service-account.name", false},
+		{"user-set legacy storage class", "volume.beta.kubernetes.io/storage-class", false},
+		{"ingress controller config", "nginx.ingress.kubernetes.io/rewrite-target", false},
 		{"custom annotation", "custom.annotation/value", false},
 		{"empty string", "", false},
 	}
@@ -188,6 +196,7 @@ func TestCleanService(t *testing.T) {
 			ClusterIPs:               []string{"10.0.0.1"},
 			ExternalIPs:              []string{"1.2.3.4"},
 			LoadBalancerIP:           "5.6.7.8",
+			LoadBalancerSourceRanges: []string{"203.0.113.0/24"},
 			ExternalTrafficPolicy:    corev1.ServiceExternalTrafficPolicyTypeCluster,
 			SessionAffinity:          corev1.ServiceAffinityNone,
 			HealthCheckNodePort:      30000,
@@ -220,11 +229,15 @@ func TestCleanService(t *testing.T) {
 	if svc.Spec.ClusterIPs != nil {
 		t.Errorf("ClusterIPs not cleared: got %v", svc.Spec.ClusterIPs)
 	}
-	if svc.Spec.ExternalIPs != nil {
-		t.Errorf("ExternalIPs not cleared: got %v", svc.Spec.ExternalIPs)
+	// User-set addressing and firewall fields must survive a restore
+	if !reflect.DeepEqual(svc.Spec.ExternalIPs, []string{"1.2.3.4"}) {
+		t.Errorf("ExternalIPs changed: got %v", svc.Spec.ExternalIPs)
 	}
-	if svc.Spec.LoadBalancerIP != "" {
-		t.Errorf("LoadBalancerIP not cleared: got %q", svc.Spec.LoadBalancerIP)
+	if svc.Spec.LoadBalancerIP != "5.6.7.8" {
+		t.Errorf("LoadBalancerIP changed: got %q", svc.Spec.LoadBalancerIP)
+	}
+	if !reflect.DeepEqual(svc.Spec.LoadBalancerSourceRanges, []string{"203.0.113.0/24"}) {
+		t.Errorf("LoadBalancerSourceRanges changed: got %v", svc.Spec.LoadBalancerSourceRanges)
 	}
 	if svc.Spec.ExternalTrafficPolicy != "" {
 		t.Errorf("ExternalTrafficPolicy not cleared: got %v", svc.Spec.ExternalTrafficPolicy)
@@ -586,6 +599,41 @@ func TestCleanPVC(t *testing.T) {
 	}
 }
 
+func TestCleanPVCVolumeName(t *testing.T) {
+	// Dynamically provisioned: the controller picked the volume, which does not exist after a restore
+	dynamic := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "data",
+			Annotations: map[string]string{
+				"pv.kubernetes.io/bind-completed":      "yes",
+				"pv.kubernetes.io/bound-by-controller": "yes",
+				"volume.kubernetes.io/selected-node":   "node-02",
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "pvc-3d3b495b"},
+	}
+	CleanPVC(dynamic)
+	if dynamic.Spec.VolumeName != "" {
+		t.Errorf("controller-bound VolumeName not cleared: got %q", dynamic.Spec.VolumeName)
+	}
+	if dynamic.Annotations != nil {
+		t.Errorf("binding annotations not removed: got %v", dynamic.Annotations)
+	}
+
+	// Pre-bound by the user to a specific PV: keep the pin
+	preBound := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "pinned",
+			Annotations: map[string]string{"pv.kubernetes.io/bind-completed": "yes"},
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{VolumeName: "nfs-share-01"},
+	}
+	CleanPVC(preBound)
+	if preBound.Spec.VolumeName != "nfs-share-01" {
+		t.Errorf("user-set VolumeName changed: got %q", preBound.Spec.VolumeName)
+	}
+}
+
 func TestCleanServiceAccount(t *testing.T) {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -622,8 +670,9 @@ func TestCleanServiceAccount(t *testing.T) {
 	if sa.Secrets != nil {
 		t.Errorf("Secrets not cleared: got %v", sa.Secrets)
 	}
-	if sa.ImagePullSecrets != nil {
-		t.Errorf("ImagePullSecrets not cleared: got %v", sa.ImagePullSecrets)
+	// Pull secrets are user config: without them a restore hits ImagePullBackOff on private registries
+	if !reflect.DeepEqual(sa.ImagePullSecrets, []corev1.LocalObjectReference{{Name: "registry-creds"}}) {
+		t.Errorf("ImagePullSecrets changed: got %v", sa.ImagePullSecrets)
 	}
 
 	// Verify automount token is preserved (it's a user-set field)

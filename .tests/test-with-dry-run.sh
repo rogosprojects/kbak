@@ -47,11 +47,66 @@ TEST_NAMESPACE=${1:-"test"}
 OUTPUT_DIR="kbak_test_output"
 BUILD_DIR=".."
 
+# Optional bastion: kubectl and kbak reach the API server through an SSH SOCKS tunnel.
+#   BASTION             ssh destination: ssh_config alias, user@host or ssh://user@host:port
+#   BASTION_SOCKS_PORT  local SOCKS port (default 1080)
+#   BASTION_KUBECONFIG  kubeconfig path on the bastion to use (default: local $KUBECONFIG or ~/.kube/config)
+# The kubeconfig server must be reachable from the bastion and not loopback: Go never proxies 127.0.0.1/localhost.
+BASTION=${BASTION:-}
+BASTION_SOCKS_PORT=${BASTION_SOCKS_PORT:-1080}
+BASTION_KUBECONFIG=${BASTION_KUBECONFIG:-}
+BASTION_SOCKET="${TMPDIR:-/tmp}/kbak-bastion-$$.sock"
+REMOTE_KUBECONFIG_COPY=""
+
+cleanup() {
+  if [ -S "${BASTION_SOCKET}" ]; then
+    ssh -S "${BASTION_SOCKET}" -O exit "${BASTION}" &> /dev/null
+  fi
+  if [ -n "${REMOTE_KUBECONFIG_COPY}" ]; then
+    rm -f "${REMOTE_KUBECONFIG_COPY}"
+  fi
+}
+trap cleanup EXIT
+
+connect_bastion() {
+  check_command "ssh"
+  print_info "Opening SOCKS tunnel through ${BASTION} on 127.0.0.1:${BASTION_SOCKS_PORT}..."
+  # -f backgrounds only after auth and the forward succeed, so password/passphrase prompts still work
+  if ! ssh -f -N -M -S "${BASTION_SOCKET}" -o ExitOnForwardFailure=yes \
+      -D "127.0.0.1:${BASTION_SOCKS_PORT}" "${BASTION}"; then
+    print_error "Failed to open SSH tunnel to ${BASTION}."
+    exit 1
+  fi
+
+  # client-go (kubectl and kbak) honors socks5:// in HTTPS_PROXY; hostnames are resolved by the bastion
+  export HTTPS_PROXY="socks5://127.0.0.1:${BASTION_SOCKS_PORT}"
+  unset NO_PROXY no_proxy
+
+  if [ -n "${BASTION_KUBECONFIG}" ]; then
+    REMOTE_KUBECONFIG_COPY=$(mktemp)
+    if ! ssh -S "${BASTION_SOCKET}" "${BASTION}" cat "${BASTION_KUBECONFIG}" > "${REMOTE_KUBECONFIG_COPY}"; then
+      print_error "Failed to read ${BASTION_KUBECONFIG} from ${BASTION}."
+      exit 1
+    fi
+    export KUBECONFIG="${REMOTE_KUBECONFIG_COPY}"
+  fi
+  print_success "Tunnel ready, API traffic goes through ${BASTION}."
+}
+
 main() {
   print_info "Starting kbak test for namespace: ${TEST_NAMESPACE}"
 
   # Check for required commands
   check_command "kubectl"
+
+  if [ -n "${BASTION}" ]; then
+    connect_bastion
+  fi
+
+  if ! kubectl get namespace "${TEST_NAMESPACE}" &> /tmp/kbak_test_result; then
+    print_error "Cannot reach namespace ${TEST_NAMESPACE}: $(cat /tmp/kbak_test_result)"
+    exit 1
+  fi
 
   print_info "Building kbak..."
   check_command "go"

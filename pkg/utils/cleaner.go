@@ -257,6 +257,14 @@ func inferAPIVersionAndKind(obj map[string]interface{}) {
 
 // IsSystemAnnotation checks if an annotation is system-managed
 func IsSystemAnnotation(key string) bool {
+	switch key {
+	// User-set keys under system prefixes that a restore needs
+	case "kubernetes.io/ingress.class", "kubernetes.io/service-account.name":
+		return false
+	case "volume.beta.kubernetes.io/storage-provisioner":
+		return true
+	}
+
 	systemPrefixes := []string{
 		"kubernetes.io/",
 		"k8s.io/",
@@ -266,6 +274,8 @@ func IsSystemAnnotation(key string) bool {
 		"kubectl.kubernetes.io/",
 		"deployment.kubernetes.io/",
 		"meta.helm.sh/",
+		"pv.kubernetes.io/",
+		"volume.kubernetes.io/",
 	}
 
 	for _, prefix := range systemPrefixes {
@@ -393,9 +403,6 @@ func CleanService(svc *v1.Service) {
 
 	// Reset other fields that are server-populated
 	svc.Spec.ClusterIPs = nil
-	svc.Spec.ExternalIPs = nil
-	svc.Spec.LoadBalancerIP = ""
-	svc.Spec.LoadBalancerSourceRanges = nil
 
 	// Preserve intentionally set fields
 	// Only clear these if they're the default values
@@ -406,11 +413,6 @@ func CleanService(svc *v1.Service) {
 	if svc.Spec.SessionAffinity == v1.ServiceAffinityNone {
 		svc.Spec.SessionAffinity = ""
 		svc.Spec.SessionAffinityConfig = nil
-	}
-
-	// Keep PublishNotReadyAddresses if it's true (intentionally set)
-	if !svc.Spec.PublishNotReadyAddresses {
-		svc.Spec.PublishNotReadyAddresses = false
 	}
 
 	// Always clear health check node port as it's assigned by the system
@@ -445,6 +447,12 @@ func CleanSecret(secret *v1.Secret) {
 
 // CleanPVC removes server-side fields from a PersistentVolumeClaim
 func CleanPVC(pvc *v1.PersistentVolumeClaim) {
+	// A volume picked by the binder (not pre-bound by the user) won't exist after a restore,
+	// and the claim would stay Lost; let the restore provision or bind a new one
+	if pvc.Annotations["pv.kubernetes.io/bound-by-controller"] == "yes" {
+		pvc.Spec.VolumeName = ""
+	}
+
 	// Clean metadata
 	CleanMetadata(&pvc.ObjectMeta)
 
@@ -469,10 +477,9 @@ func CleanServiceAccount(sa *v1.ServiceAccount) {
 	sa.Kind = "ServiceAccount"
 
 	// Clean other server-generated fields
-	sa.Secrets = nil          // Server manages the secrets references
-	sa.ImagePullSecrets = nil // Only keep manually added ones
+	sa.Secrets = nil // Server manages the secrets references
 
-	// Keep essential fields like automountServiceAccountToken if set
+	// Keep user-set fields like imagePullSecrets and automountServiceAccountToken
 }
 
 // CleanMetadata removes server-side fields from ObjectMeta
