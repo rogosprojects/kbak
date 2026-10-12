@@ -144,7 +144,25 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		fmt.Printf("%s%sFound %d %s resources in namespace %s%s\n",
 			utils.InfoEmoji, utils.Cyan, itemCount, resource.Kind, namespace, utils.Reset)
 	}
-	if itemCount == 0 {
+
+	kept := items[:0]
+	for _, item := range items {
+		if reason := utils.SkipReason(item); reason != "" {
+			if verbose {
+				fmt.Printf("%s %sSkipping %s '%s': %s%s\n",
+					utils.SkippedEmoji, utils.Cyan, resource.Kind, utils.ExtractName(item), reason, utils.Reset)
+			}
+			continue
+		}
+		kept = append(kept, item)
+	}
+	if skipped := len(items) - len(kept); skipped > 0 {
+		fmt.Printf("%s %sSkipped %d %s resources that the cluster recreates%s\n",
+			utils.SkippedEmoji, utils.Cyan, skipped, resource.Kind, utils.Reset)
+	}
+	items = kept
+
+	if len(items) == 0 {
 		// Skip creating directories for resource kinds with no items
 		return
 	}
