@@ -1,6 +1,7 @@
 package utils
 
 import (
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -154,6 +155,14 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 		return result, len(result)
 
 	case *batchv1.JobList:
+		result := make([]interface{}, len(v.Items))
+		for i, item := range v.Items {
+			item := item
+			result[i] = &item
+		}
+		return result, len(result)
+
+	case *routev1.RouteList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
 			item := item

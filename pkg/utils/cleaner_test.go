@@ -5,10 +5,12 @@ import (
 	"testing"
 	"time"
 
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 func TestIsSystemAnnotation(t *testing.T) {
@@ -927,5 +929,108 @@ func TestCleanConfigMap(t *testing.T) {
 	}
 	if cm.Kind != "ConfigMap" {
 		t.Errorf("Kind not set correctly: got %q, want %q", cm.Kind, "ConfigMap")
+	}
+}
+
+func TestCleanRoute(t *testing.T) {
+	port := intstr.FromString("8080")
+	route := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-route",
+			Namespace:       "test-namespace",
+			ResourceVersion: "999",
+			UID:             "route-uid-abc",
+			Labels:          map[string]string{"app": "my-app"},
+			Annotations: map[string]string{
+				"custom/note":              "keep-this",
+				"kubernetes.io/managed-by": "remove-this",
+			},
+		},
+		Spec: routev1.RouteSpec{
+			Host: "myapp.example.com",
+			Path: "/api",
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: "my-service",
+			},
+			Port: &routev1.RoutePort{
+				TargetPort: port,
+			},
+		},
+		Status: routev1.RouteStatus{
+			Ingress: []routev1.RouteIngress{
+				{Host: "myapp.example.com", RouterName: "default"},
+			},
+		},
+	}
+
+	CleanRoute(route)
+
+	// Server-side fields must be removed
+	if route.ResourceVersion != "" {
+		t.Errorf("ResourceVersion not cleared: got %q", route.ResourceVersion)
+	}
+	if string(route.UID) != "" {
+		t.Errorf("UID not cleared: got %q", route.UID)
+	}
+	if !reflect.DeepEqual(route.Status, routev1.RouteStatus{}) {
+		t.Errorf("Status not cleared: got %+v", route.Status)
+	}
+
+	// User-defined fields must be preserved
+	if route.Name != "test-route" {
+		t.Errorf("Name changed: got %q", route.Name)
+	}
+	if route.Namespace != "test-namespace" {
+		t.Errorf("Namespace changed: got %q", route.Namespace)
+	}
+	if !reflect.DeepEqual(route.Labels, map[string]string{"app": "my-app"}) {
+		t.Errorf("Labels changed: got %v", route.Labels)
+	}
+	if route.Spec.Host != "myapp.example.com" {
+		t.Errorf("Spec.Host changed: got %q", route.Spec.Host)
+	}
+	if route.Spec.Path != "/api" {
+		t.Errorf("Spec.Path changed: got %q", route.Spec.Path)
+	}
+	if route.Spec.To.Name != "my-service" {
+		t.Errorf("Spec.To.Name changed: got %q", route.Spec.To.Name)
+	}
+
+	// System annotations must be removed; user annotations preserved
+	expectedAnnotations := map[string]string{"custom/note": "keep-this"}
+	if !reflect.DeepEqual(route.Annotations, expectedAnnotations) {
+		t.Errorf("Annotations not cleaned correctly: got %v, want %v", route.Annotations, expectedAnnotations)
+	}
+
+	// APIVersion and Kind must be set correctly
+	if route.APIVersion != "route.openshift.io/v1" {
+		t.Errorf("APIVersion not set correctly: got %q, want %q", route.APIVersion, "route.openshift.io/v1")
+	}
+	if route.Kind != "Route" {
+		t.Errorf("Kind not set correctly: got %q, want %q", route.Kind, "Route")
+	}
+}
+
+func TestCleanRouteGeneratedHost(t *testing.T) {
+	route := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "web",
+			Annotations: map[string]string{
+				"openshift.io/host.generated": "true",
+				"custom/note":                 "keep-this",
+			},
+		},
+		Spec: routev1.RouteSpec{Host: "web-shop.apps.cluster-a.example.com"},
+	}
+
+	CleanRoute(route)
+
+	if route.Spec.Host != "" {
+		t.Errorf("generated Spec.Host not cleared: got %q", route.Spec.Host)
+	}
+	expectedAnnotations := map[string]string{"custom/note": "keep-this"}
+	if !reflect.DeepEqual(route.Annotations, expectedAnnotations) {
+		t.Errorf("Annotations: got %v, want %v", route.Annotations, expectedAnnotations)
 	}
 }

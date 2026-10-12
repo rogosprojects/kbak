@@ -6,6 +6,7 @@ import (
 
 	"github.com/rogosprojects/kbak/pkg/client"
 
+	routeclientv1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -100,6 +101,16 @@ func GetAllResourceTypes() []ResourceType {
 			Kind: "Job",
 			APIFunc: func(client *client.K8sClient, ns string, opts metav1.ListOptions) (interface{}, error) {
 				return client.Clientset.BatchV1().Jobs(ns).List(context.TODO(), opts)
+			},
+		},
+		{
+			Kind: "Route",
+			APIFunc: func(c *client.K8sClient, ns string, opts metav1.ListOptions) (interface{}, error) {
+				routeClient, err := routeclientv1.NewForConfig(c.Config)
+				if err != nil {
+					return nil, err
+				}
+				return routeClient.Routes(ns).List(context.TODO(), opts)
 			},
 		},
 	}

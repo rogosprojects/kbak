@@ -3,6 +3,7 @@ package utils
 import (
 	"strings"
 
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -83,6 +84,10 @@ func CleanObject(obj interface{}) {
 	// ServiceAccount
 	case *v1.ServiceAccount:
 		CleanServiceAccount(typedObj)
+
+	// Route (OpenShift)
+	case *routev1.Route:
+		CleanRoute(typedObj)
 
 	// For all other types, try as unstructured
 	default:
@@ -721,4 +726,23 @@ func CleanClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding) {
 	// Set API version and kind for valid Kubernetes manifests
 	clusterRoleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
 	clusterRoleBinding.Kind = "ClusterRoleBinding"
+}
+
+// CleanRoute removes server-side fields from an OpenShift Route
+func CleanRoute(route *routev1.Route) {
+	// Remove status (contains router-assigned ingress info)
+	route.Status = routev1.RouteStatus{}
+
+	// Clean metadata
+	CleanMetadata(&route.ObjectMeta)
+
+	// A server-generated host embeds the source cluster's domain; let the target cluster regenerate it
+	if route.Annotations["openshift.io/host.generated"] == "true" {
+		route.Spec.Host = ""
+		delete(route.Annotations, "openshift.io/host.generated")
+	}
+
+	// Set API version and kind for valid OpenShift manifests
+	route.APIVersion = "route.openshift.io/v1"
+	route.Kind = "Route"
 }
