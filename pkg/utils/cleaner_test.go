@@ -543,6 +543,26 @@ func TestCleanSecret(t *testing.T) {
 	if secret.Kind != "Secret" {
 		t.Errorf("Kind not set correctly: got %q, want %q", secret.Kind, "Secret")
 	}
+
+	// Legacy service account token: keep the SA link, drop the old token so the cluster issues a new one
+	token := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "app-sa-token",
+			Annotations: map[string]string{
+				"kubernetes.io/service-account.name": "app-sa",
+				"kubernetes.io/service-account.uid":  "old-uid",
+			},
+		},
+		Type: corev1.SecretTypeServiceAccountToken,
+		Data: map[string][]byte{"token": []byte("old"), "ca.crt": []byte("old-ca"), "namespace": []byte("ns")},
+	}
+	CleanSecret(token)
+	if !reflect.DeepEqual(token.Annotations, map[string]string{"kubernetes.io/service-account.name": "app-sa"}) {
+		t.Errorf("token Secret annotations: got %v", token.Annotations)
+	}
+	if token.Data != nil {
+		t.Errorf("token Secret data not cleared: got %v", token.Data)
+	}
 }
 
 func TestCleanPVC(t *testing.T) {

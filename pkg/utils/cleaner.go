@@ -441,8 +441,13 @@ func CleanSecret(secret *v1.Secret) {
 	secret.APIVersion = "v1"
 	secret.Kind = "Secret"
 
-	// Keep the data and type fields intact
-	// The actual Secret data should be preserved
+	// The old token is bound to the old service account UID and is rejected after a restore;
+	// with empty data the token controller fills in a valid token, CA and namespace
+	if secret.Type == v1.SecretTypeServiceAccountToken {
+		secret.Data = nil
+	}
+
+	// Keep the data and type fields intact for all other Secrets
 }
 
 // CleanPVC removes server-side fields from a PersistentVolumeClaim
