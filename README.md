@@ -106,6 +106,7 @@ You can selectively backup specific resource types using these flags:
 --rolebinding     Backup only rolebindings
 --cronjob         Backup only cronjobs
 --job             Backup only jobs
+--route           Backup only OpenShift routes
 ```
 
 When using resource type flags, set `--all-resources=false` to backup only the specified types.
@@ -120,7 +121,7 @@ The tool automatically backs up the following resource types:
 - Networking resources: Ingresses
 - Batch resources: Jobs, CronJobs
 - RBAC resources: Roles, RoleBindings
-- OpenShift resources: Routes (skipped on clusters without the `route.openshift.io` API; no filter flag yet, so they are only included when no specific type flag is set)
+- OpenShift resources: Routes (skipped on clusters without the `route.openshift.io` API)
 
 ## Output Structure
 

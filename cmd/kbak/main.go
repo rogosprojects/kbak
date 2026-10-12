@@ -37,6 +37,7 @@ type resourceFlags struct {
 	rolebinding    bool
 	cronjob        bool
 	job            bool
+	route          bool
 }
 
 func main() {
@@ -73,6 +74,7 @@ func main() {
 	flag.BoolVar(&resFlags.rolebinding, "rolebinding", false, "Backup only rolebindings")
 	flag.BoolVar(&resFlags.cronjob, "cronjob", false, "Backup only cronjobs")
 	flag.BoolVar(&resFlags.job, "job", false, "Backup only jobs")
+	flag.BoolVar(&resFlags.route, "route", false, "Backup only OpenShift routes")
 
 	if home := homedir.HomeDir(); home != "" {
 		flag.StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"), "Path to kubeconfig file")
@@ -241,7 +243,7 @@ func buildResourceTypeMap(flags resourceFlags) map[string]bool {
 		flags.configmap || flags.secret || flags.pvc ||
 		flags.serviceaccount || flags.statefulset || flags.daemonset ||
 		flags.ingress || flags.role || flags.rolebinding ||
-		flags.cronjob || flags.job
+		flags.cronjob || flags.job || flags.route
 
 	// If no specific types are selected or --all-resources is true (default), return empty map to include all
 	if flags.all && !specificTypesSelected {
@@ -290,6 +292,9 @@ func buildResourceTypeMap(flags resourceFlags) map[string]bool {
 	}
 	if flags.job {
 		selectedTypes["job"] = true
+	}
+	if flags.route {
+		selectedTypes["route"] = true
 	}
 
 	return selectedTypes
