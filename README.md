@@ -19,6 +19,7 @@ A Go application that backs up Kubernetes resources from a specified namespace b
 - Uses the current namespace from kubeconfig when no namespace is specified
 - Organizes backups by resource kind in separate directories
 - Thoroughly cleans manifests by removing server-side and cluster-specific fields
+- Leaves out objects the cluster recreates by itself (Pods and Jobs owned by a controller, the `kube-root-ca.crt` ConfigMap)
 - Timestamp-based backup directories
 - Colorful and descriptive console output with emojis
 - Resource type filtering for selective backups
@@ -75,17 +76,17 @@ Backup files are created readable only by their owner (`0600`, folders `0700`), 
 # Backup all namespaces
 ./kbak --all-namespaces
 
-# Specify a custom kubeconfig file
+# Specify a custom kubeconfig file (default: $KUBECONFIG, then ~/.kube/config, then the in-cluster service account)
 ./kbak --namespace your-namespace --kubeconfig /path/to/kubeconfig
 
 # Specify a custom output directory
 ./kbak --namespace your-namespace --output /path/to/backup/dir
 
 # Backup only specific resource types (e.g., only ConfigMaps and Secrets)
-./kbak --namespace your-namespace --configmap --secret --all-resources=false
+./kbak --namespace your-namespace --configmap --secret
 
 # Backup only pods and deployments
-./kbak --namespace your-namespace --pod --deployment --all-resources=false
+./kbak --namespace your-namespace --pod --deployment
 
 # Backup resources with verbose output
 ./kbak --namespace your-namespace --verbose
@@ -114,8 +115,9 @@ You can selectively backup specific resource types using these flags:
 --route           Backup only OpenShift routes
 ```
 
-When using resource type flags, set `--all-resources=false` to backup only the specified types.
+Any resource type flag limits the backup to the selected types. Without one, every type is backed up.
 
+The exit code is `1` if any resource could not be listed or written (for example, missing RBAC permissions) or the namespace does not exist, so scheduled backups can alert on failures.
 
 ## Supported Resources
 
@@ -165,6 +167,24 @@ Each run writes to a new folder named after its start time (`YYYY-MM-DD_HH-MM-SS
     │   └── ...
     └── ...
 ```
+
+## Restoring
+
+```bash
+kubectl create namespace your-namespace
+# ServiceAccounts first: pods and token Secrets are rejected or deleted if their account is missing
+kubectl apply -R -f backups/<timestamp>/your-namespace/ServiceAccount
+kubectl apply -R -f backups/<timestamp>/your-namespace
+```
+
+What to expect:
+
+- Pods and Jobs created by controllers are not in the backup; their Deployments, StatefulSets, DaemonSets and CronJobs recreate them.
+- A restored Job runs again.
+- PersistentVolumeClaims come back empty and are provisioned again: kbak saves manifests, not volume data.
+- Service account token Secrets receive a new token from the target cluster.
+- Service `nodePort` values, including auto-assigned ones, are kept and can clash with ports already used on another cluster.
+
 ## License
 
 MIT License
