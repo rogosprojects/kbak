@@ -99,7 +99,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	backupDir := filepath.Join(outputDir, time.Now().Format("02Jan2006-15:04"))
+	// Sortable, unique per second, and free of ':' (invalid in Windows paths)
+	backupDir := filepath.Join(outputDir, time.Now().Format("2006-01-02_15-04-05"))
 	var namespaces []string
 	target := "all namespaces"
 

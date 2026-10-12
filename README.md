@@ -125,9 +125,11 @@ The tool automatically backs up the following resource types:
 
 ## Output Structure
 
+Each run writes to a new folder named after its start time (`YYYY-MM-DD_HH-MM-SS`), so folders sort chronologically.
+
 ### Single Namespace Backup
 ```
-02Jan2006-15:04/
+2026-01-02_15-04-05/
 └── namespace/
     ├── Pod/
     │   ├── my-pod.yaml
@@ -143,7 +145,7 @@ The tool automatically backs up the following resource types:
 
 ### All Namespaces Backup
 ```
-02Jan2006-15:04/
+2026-01-02_15-04-05/
 └── all-namespaces/
     ├── namespace1/
     │   ├── Pod/
