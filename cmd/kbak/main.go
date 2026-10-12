@@ -11,6 +11,7 @@ import (
 	"github.com/rogosprojects/kbak/pkg/backup"
 	"github.com/rogosprojects/kbak/pkg/client"
 	"github.com/rogosprojects/kbak/pkg/utils"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -98,121 +99,73 @@ func main() {
 		os.Exit(1)
 	}
 
-	// If namespace is not specified and not using all-namespaces, use the kubeconfig (or in-cluster) namespace
-	if namespace == "" && !allNamespaces {
-		namespace = k8sClient.Namespace
-		if verbose {
-			fmt.Printf(" %sUsing current namespace: %s%s\n",
-				utils.Cyan, namespace, utils.Reset)
-		}
-	}
+	backupDir := filepath.Join(outputDir, time.Now().Format("02Jan2006-15:04"))
+	var namespaces []string
+	target := "all namespaces"
 
-	// Handle all-namespaces case
 	if allNamespaces {
-		// Get all namespaces
-		namespaces, err := k8sClient.Clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+		list, err := k8sClient.Clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			fmt.Printf("%s %s%sError listing namespaces: %v%s\n",
 				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
 			os.Exit(1)
 		}
-
-		// Create parent backup directory
-		timestamp := time.Now().Format("02Jan2006-15:04")
-		parentBackupDir := filepath.Join(outputDir, timestamp, "all-namespaces")
-
-		if err := os.MkdirAll(parentBackupDir, 0755); err != nil {
-			fmt.Printf("%s %s%sError creating output directory: %v%s\n",
-				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
-			os.Exit(1)
+		for _, ns := range list.Items {
+			namespaces = append(namespaces, ns.Name)
 		}
-
-		fmt.Printf("%s %s%sStarting backup of all namespaces to '%s'%s\n\n",
-			utils.StartEmoji, utils.Blue, utils.Bold, parentBackupDir, utils.Reset)
-
-		totalResourceCount := 0
-		totalErrorCount := 0
-
-		// Process each namespace
-		for _, ns := range namespaces.Items {
-			nsName := ns.Name
-			nsBackupDir := filepath.Join(parentBackupDir, nsName)
-
-			if err := os.MkdirAll(nsBackupDir, 0755); err != nil {
-				fmt.Printf("%s %s%sError creating directory for namespace %s: %v%s\n",
-					utils.ErrorEmoji, utils.Red, utils.Bold, nsName, err, utils.Reset)
-				totalErrorCount++
-				continue
+		backupDir = filepath.Join(backupDir, "all-namespaces")
+	} else {
+		// If namespace is not specified, use the kubeconfig (or in-cluster) namespace
+		if namespace == "" {
+			namespace = k8sClient.Namespace
+			if verbose {
+				fmt.Printf(" %sUsing current namespace: %s%s\n",
+					utils.Cyan, namespace, utils.Reset)
 			}
-
-			// Prepare resource type filter
-			selectedTypes := buildResourceTypeMap(resFlags)
-
-			fmt.Printf("%sProcessing namespace: %s%s\n",
-				utils.Blue, nsName, utils.Reset)
-
-			// Perform backup for this namespace
-			resourceCount, errorCount := backup.PerformBackup(k8sClient, nsName, nsBackupDir, selectedTypes, verbose)
-
-			totalResourceCount += resourceCount
-			totalErrorCount += errorCount
 		}
-
-		if totalResourceCount > 0 {
-			fmt.Printf("\n%s %s%sBackup completed successfully to %s (%d resources total across all namespaces)%s\n",
-				utils.SuccessEmoji, utils.Green, utils.Bold, parentBackupDir, totalResourceCount, utils.Reset)
-		} else {
-			fmt.Printf("\n%s %s%sNo resources found to backup in any namespace%s\n",
-				utils.WarningEmoji, utils.Yellow, utils.Bold, utils.Reset)
-		}
-
-		// Exit with error code if there were errors
-		if totalErrorCount > 0 {
-			fmt.Printf("%s %s%sCompleted with %d errors%s\n",
-				utils.ErrorEmoji, utils.Red, utils.Bold, totalErrorCount, utils.Reset)
+		// Listing in a missing namespace returns nothing, so a typo would pass as an empty backup.
+		// Other errors (e.g. no permission to get namespaces) are left to the list calls.
+		if _, err := k8sClient.Clientset.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+			fmt.Printf("%s %s%sNamespace '%s' does not exist%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, namespace, utils.Reset)
 			os.Exit(1)
 		}
-
-		os.Exit(0)
+		namespaces = []string{namespace}
+		target = fmt.Sprintf("namespace '%s'", namespace)
+		backupDir = filepath.Join(backupDir, namespace)
 	}
 
-	// Create output directory with timestamp
-	timestamp := time.Now().Format("02Jan2006-15:04")
-	backupDir := filepath.Join(outputDir, timestamp, namespace)
-
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		fmt.Printf("%s %s%sError creating output directory: %v%s\n",
-			utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
-		os.Exit(1)
-	}
-
-	// Prepare resource type filter
 	selectedTypes := buildResourceTypeMap(resFlags)
-
+	scope := "all resource types"
 	if len(selectedTypes) > 0 {
-		fmt.Printf("%s %s%sStarting backup of selected resource types from namespace '%s' to '%s'%s\n\n",
-			utils.StartEmoji, utils.Blue, utils.Bold, namespace, backupDir, utils.Reset)
-	} else {
-		fmt.Printf("%s %s%sStarting backup of all resource types from namespace '%s' to '%s'%s\n\n",
-			utils.StartEmoji, utils.Blue, utils.Bold, namespace, backupDir, utils.Reset)
+		scope = "selected resource types"
+	}
+	fmt.Printf("%s %s%sStarting backup of %s from %s to '%s'%s\n\n",
+		utils.StartEmoji, utils.Blue, utils.Bold, scope, target, backupDir, utils.Reset)
+
+	totalResourceCount, totalErrorCount := 0, 0
+	for _, ns := range namespaces {
+		nsBackupDir := backupDir
+		if allNamespaces {
+			nsBackupDir = filepath.Join(backupDir, ns)
+			fmt.Printf("%sProcessing namespace: %s%s\n", utils.Blue, ns, utils.Reset)
+		}
+		resourceCount, errorCount := backup.PerformBackup(k8sClient, ns, nsBackupDir, selectedTypes, verbose)
+		totalResourceCount += resourceCount
+		totalErrorCount += errorCount
 	}
 
-	// Perform backup
-	resourceCount, errorCount := backup.PerformBackup(k8sClient, namespace, backupDir, selectedTypes, verbose)
-
-	if resourceCount > 0 {
-		fmt.Printf("\n%s %s%sBackup completed successfully to %s (%d resources total)%s\n",
-			utils.SuccessEmoji, utils.Green, utils.Bold, backupDir, resourceCount, utils.Reset)
-	} else {
-		fmt.Printf("\n%s %s%sNo resources found to backup in namespace '%s'%s\n",
-			utils.WarningEmoji, utils.Yellow, utils.Bold, namespace, utils.Reset)
-	}
-
-	// Exit with error code if there were errors
-	if errorCount > 0 {
-		fmt.Printf("%s %s%sCompleted with %d errors%s\n",
-			utils.ErrorEmoji, utils.Red, utils.Bold, errorCount, utils.Reset)
+	switch {
+	case totalErrorCount > 0:
+		fmt.Printf("\n%s %s%sBackup to %s finished with %d errors (%d resources saved)%s\n",
+			utils.ErrorEmoji, utils.Red, utils.Bold, backupDir, totalErrorCount, totalResourceCount, utils.Reset)
 		os.Exit(1)
+	case totalResourceCount == 0:
+		fmt.Printf("\n%s %s%sNo resources found to backup in %s%s\n",
+			utils.WarningEmoji, utils.Yellow, utils.Bold, target, utils.Reset)
+	default:
+		fmt.Printf("\n%s %s%sBackup completed successfully to %s (%d resources total)%s\n",
+			utils.SuccessEmoji, utils.Green, utils.Bold, backupDir, totalResourceCount, utils.Reset)
 	}
 }
 
