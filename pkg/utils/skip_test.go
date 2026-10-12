@@ -5,6 +5,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,6 +16,9 @@ func TestSkipReason(t *testing.T) {
 			Name:            "child",
 			OwnerReferences: []metav1.OwnerReference{{Kind: kind, Name: name, Controller: &isController}},
 		}
+	}
+	secret := func(name, annotation, value string) *corev1.Secret {
+		return &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name, Annotations: map[string]string{annotation: value}}}
 	}
 	notController := metav1.ObjectMeta{
 		Name:            "child",
@@ -35,6 +39,18 @@ func TestSkipReason(t *testing.T) {
 		{"kube-root-ca.crt", &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "kube-root-ca.crt"}}, true},
 		{"user configmap", &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "app-config"}}, false},
 		{"other kinds with a controller are kept", &corev1.Service{ObjectMeta: owned("Operator", "x")}, false},
+
+		// OpenShift
+		{"openshift-service-ca.crt", &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "openshift-service-ca.crt"}}, true},
+		{"4.16+ generated pull secret", secret("builder-dockercfg-x7k2p", "openshift.io/internal-registry-auth-token.service-account", "builder"), true},
+		{"legacy generated dockercfg", secret("default-dockercfg-abcde", "openshift.io/token-secret.name", "default-token-fghij"), true},
+		{"legacy generated SA token", secret("default-token-fghij", "kubernetes.io/created-by", "openshift.io/create-dockercfg-secrets"), true},
+		{"service-ca serving cert", secret("web-tls", "service.beta.openshift.io/originating-service-name", "web"), true},
+		{"user token secret", secret("app-sa-token", "kubernetes.io/service-account.name", "app-sa"), false},
+		{"user secret", secret("app-secret", "team/owner", "platform"), false},
+		{"image pullers binding", &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "system:image-pullers"}}, true},
+		{"deployers binding", &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "system:deployers"}}, true},
+		{"project admin binding", &rbacv1.RoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "admin"}}, false},
 	}
 
 	for _, tt := range tests {

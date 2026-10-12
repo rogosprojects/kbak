@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"filippo.io/age"
 	"github.com/rogosprojects/kbak/pkg/backup"
 	"github.com/rogosprojects/kbak/pkg/client"
 	"github.com/rogosprojects/kbak/pkg/utils"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -46,6 +48,7 @@ func main() {
 	var verbose bool
 	var showVersion bool
 	var allNamespaces bool
+	var recipientsFile string
 
 	// Define resource type flags
 	var resFlags resourceFlags
@@ -56,6 +59,7 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "Show verbose output")
 	flag.BoolVar(&showVersion, "version", false, "Show version information and exit")
 	flag.BoolVar(&allNamespaces, "all-namespaces", false, "Backup resources from all namespaces")
+	flag.StringVar(&recipientsFile, "age-recipients-file", "", "Encrypt every file with age to the public keys in this file (one per line, as for age -R); writes <name>.yaml.age")
 
 	// Resource type flags
 	flag.BoolVar(&resFlags.all, "all-resources", true, "Backup all resource types (default)")
@@ -89,6 +93,17 @@ func main() {
 		fmt.Printf("%s %s%sWarning: --namespace flag is ignored when --all-namespaces is used%s\n",
 			utils.WarningEmoji, utils.Yellow, utils.Bold, utils.Reset)
 		namespace = ""
+	}
+
+	// Fail before touching the cluster: an unusable key must never fall back to plain text
+	var recipients []age.Recipient
+	if recipientsFile != "" {
+		var err error
+		if recipients, err = utils.LoadRecipients(recipientsFile); err != nil {
+			fmt.Printf("%s %s%sError loading age recipients: %v%s\n",
+				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
+			os.Exit(1)
+		}
 	}
 
 	// Initialize Kubernetes client first to validate connectivity
@@ -141,6 +156,10 @@ func main() {
 	if len(selectedTypes) > 0 {
 		scope = "selected resource types"
 	}
+	if recipients != nil {
+		fmt.Printf("%s %sEncrypting with age to %d recipient(s) from '%s'%s\n",
+			utils.InfoEmoji, utils.Cyan, len(recipients), recipientsFile, utils.Reset)
+	}
 	fmt.Printf("%s %s%sStarting backup of %s from %s to '%s'%s\n\n",
 		utils.StartEmoji, utils.Blue, utils.Bold, scope, target, backupDir, utils.Reset)
 
@@ -151,7 +170,7 @@ func main() {
 			nsBackupDir = filepath.Join(backupDir, ns)
 			fmt.Printf("%sProcessing namespace: %s%s\n", utils.Blue, ns, utils.Reset)
 		}
-		resourceCount, errorCount := backup.PerformBackup(k8sClient, ns, nsBackupDir, selectedTypes, verbose)
+		resourceCount, errorCount := backup.PerformBackup(k8sClient, ns, nsBackupDir, selectedTypes, recipients, verbose)
 		totalResourceCount += resourceCount
 		totalErrorCount += errorCount
 	}

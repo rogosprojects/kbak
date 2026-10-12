@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"filippo.io/age"
 	"github.com/rogosprojects/kbak/pkg/client"
 	"github.com/rogosprojects/kbak/pkg/resources"
 	"github.com/rogosprojects/kbak/pkg/utils"
@@ -34,7 +35,8 @@ func NewBackupStats() *BackupStats {
 
 // PerformBackup performs the backup of resources in the specified namespace
 // Returns statistics about the backup operation including counts of resources backed up and errors
-func PerformBackup(k8sClient *client.K8sClient, namespace, backupDir string, selectedTypes map[string]bool, verbose bool) (int, int) {
+// With recipients set, every file is written age-encrypted as <name>.yaml.age and never in plain text.
+func PerformBackup(k8sClient *client.K8sClient, namespace, backupDir string, selectedTypes map[string]bool, recipients []age.Recipient, verbose bool) (int, int) {
 	stats := NewBackupStats()
 	resourceTypes := resources.GetResourceTypes(selectedTypes)
 
@@ -46,7 +48,7 @@ func PerformBackup(k8sClient *client.K8sClient, namespace, backupDir string, sel
 
 	// Backup each resource type
 	for _, resource := range resourceTypes {
-		backupResourceType(k8sClient, namespace, backupDir, resource, stats, verbose)
+		backupResourceType(k8sClient, namespace, backupDir, resource, recipients, stats, verbose)
 	}
 
 	return stats.ResourceCount, stats.ErrorCount
@@ -102,7 +104,7 @@ func ensureValidFilename(name string) string {
 
 // backupResourceType handles the backup of a single resource type
 func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string,
-	resource resources.ResourceType, stats *BackupStats, verbose bool) {
+	resource resources.ResourceType, recipients []age.Recipient, stats *BackupStats, verbose bool) {
 
 	var objects interface{}
 	var err error
@@ -209,8 +211,20 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 			continue
 		}
 
+		ext := ".yaml"
+		if recipients != nil {
+			if yamlData, err = utils.Encrypt(yamlData, recipients); err != nil {
+				fmt.Printf("%s %s%sError encrypting %s '%s': %v%s\n",
+					utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, name, err, utils.Reset)
+				stats.ErrorCount++
+				stats.ResourceErrors[resource.Kind]++
+				continue
+			}
+			ext = ".yaml.age"
+		}
+
 		// Save to file
-		filename := filepath.Join(kindDir, safeName+".yaml")
+		filename := filepath.Join(kindDir, safeName+ext)
 		if err := os.WriteFile(filename, yamlData, 0600); err != nil {
 			fmt.Printf("%s %s%sError writing %s '%s': %v%s\n",
 				utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, name, err, utils.Reset)

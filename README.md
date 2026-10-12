@@ -23,6 +23,7 @@ A Go application that backs up Kubernetes resources from a specified namespace b
 - Timestamp-based backup directories
 - Colorful and descriptive console output with emojis
 - Resource type filtering for selective backups
+- Optional [age](https://age-encryption.org) encryption of every file to public keys, so the machine running the backup can't read it back
 
 ## Installation
 
@@ -90,6 +91,9 @@ Backup files are created readable only by their owner (`0600`, folders `0700`), 
 
 # Backup resources with verbose output
 ./kbak --namespace your-namespace --verbose
+
+# Encrypt every file with age (see Encryption)
+./kbak --namespace your-namespace --age-recipients-file recipients.txt
 ```
 
 ### Resource Type Filtering
@@ -166,6 +170,51 @@ Each run writes to a new folder named after its start time (`YYYY-MM-DD_HH-MM-SS
     │   │   └── ...
     │   └── ...
     └── ...
+```
+
+## Encryption
+
+With `--age-recipients-file`, every manifest is encrypted with [age](https://age-encryption.org) and written as `<name>.yaml.age` instead of `<name>.yaml`. The folder layout stays the same. Plain text never reaches the disk.
+
+kbak only needs **public keys**. The private key stays elsewhere (an admin laptop, a vault), so a stolen backup host or CronJob cannot decrypt the backups.
+
+```bash
+# Once, on the machine that will decrypt. Post-quantum keys are recommended for long-lived backups.
+age-keygen -pq -o key.txt              # private key: keep it safe and out of the cluster
+age-keygen -y key.txt > recipients.txt # public key: give this to kbak
+
+./kbak --namespace your-namespace --age-recipients-file recipients.txt
+```
+
+`recipients.txt` uses the `age -R` format: one native age public key per line (`age1pq1...` or `age1...`), with `#` comments and blank lines allowed. Every file is encrypted to all keys in it, and any of their private keys can decrypt it. Post-quantum and classic keys can't be mixed, and SSH keys are not accepted.
+
+> **If you lose every private key, the backups can't be recovered.** Add a second, offline break-glass key to `recipients.txt`.
+
+If the file is missing, empty, or has an invalid key, kbak exits with `1` before contacting the cluster. If an object fails to encrypt, it is counted as an error and nothing is written for it. kbak never falls back to plain text.
+
+In a CronJob, mount the recipients file from a ConfigMap, since it holds no secret:
+
+```yaml
+containers:
+  - name: kbak
+    image: kbak:latest
+    args: ["--all-namespaces", "--age-recipients-file", "/etc/kbak/recipients.txt"]
+    volumeMounts:
+      - { name: recipients, mountPath: /etc/kbak, readOnly: true }
+volumes:
+  - name: recipients
+    configMap: { name: kbak-age-recipients }
+```
+
+Decrypt with the [age CLI](https://github.com/FiloSottile/age#installation). kbak is not needed:
+
+```bash
+# One object, straight to the cluster
+age -d -i key.txt backups/<timestamp>/your-namespace/Secret/my-secret.yaml.age | kubectl apply -f -
+
+# Decrypt a whole backup next to the encrypted files, then restore it as below.
+# umask 077 because age creates its output with your default umask (usually world-readable)
+(umask 077; find backups/<timestamp> -name '*.yaml.age' -exec sh -c 'age -d -i key.txt -o "${1%.age}" "$1"' _ {} \;)
 ```
 
 ## Restoring

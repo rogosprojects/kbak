@@ -33,6 +33,16 @@ func TestIsSystemAnnotation(t *testing.T) {
 		{"user-set legacy storage class", "volume.beta.kubernetes.io/storage-class", false},
 		{"ingress controller config", "nginx.ingress.kubernetes.io/rewrite-target", false},
 		{"custom annotation", "custom.annotation/value", false},
+		{"OpenShift admitting SCC", "openshift.io/scc", true},
+		{"OpenShift SA pull secret ref", "openshift.io/internal-registry-pull-secret-ref", true},
+		{"OVN pod networks", "k8s.ovn.org/pod-networks", true},
+		{"Multus network status", "k8s.v1.cni.cncf.io/network-status", true},
+		{"user-set Multus networks", "k8s.v1.cni.cncf.io/networks", false},
+		{"service CA signer", "service.beta.openshift.io/serving-cert-signed-by", true},
+		{"service CA error count", "service.alpha.openshift.io/serving-cert-generation-error-num", true},
+		{"user-set serving cert request", "service.beta.openshift.io/serving-cert-secret-name", false},
+		{"Route generated host marker is read by CleanRoute", "openshift.io/host.generated", false},
+		{"user-set image trigger", "image.openshift.io/triggers", false},
 		{"empty string", "", false},
 	}
 
@@ -976,5 +986,28 @@ func TestCleanRouteGeneratedHost(t *testing.T) {
 	expectedAnnotations := map[string]string{"custom/note": "keep-this"}
 	if !reflect.DeepEqual(route.Annotations, expectedAnnotations) {
 		t.Errorf("Annotations: got %v, want %v", route.Annotations, expectedAnnotations)
+	}
+}
+
+func TestDropGeneratedPullSecrets(t *testing.T) {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{Name: "builder"},
+		ImagePullSecrets: []corev1.LocalObjectReference{
+			{Name: "builder-dockercfg-x7k2p"}, {Name: "registry-creds"}, {Name: "default-dockercfg-abcde"},
+		},
+	}
+	CleanServiceAccount(sa)
+	want := []corev1.LocalObjectReference{{Name: "registry-creds"}, {Name: "default-dockercfg-abcde"}}
+	if !reflect.DeepEqual(sa.ImagePullSecrets, want) {
+		t.Errorf("ServiceAccount ImagePullSecrets = %v, want %v", sa.ImagePullSecrets, want)
+	}
+
+	// A pod with no serviceAccountName runs as "default" and gets default's generated secret injected
+	pod := &corev1.Pod{Spec: corev1.PodSpec{
+		ImagePullSecrets: []corev1.LocalObjectReference{{Name: "default-dockercfg-abcde"}},
+	}}
+	CleanPod(pod)
+	if len(pod.Spec.ImagePullSecrets) != 0 {
+		t.Errorf("Pod ImagePullSecrets = %v, want none", pod.Spec.ImagePullSecrets)
 	}
 }

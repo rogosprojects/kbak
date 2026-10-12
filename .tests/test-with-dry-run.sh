@@ -47,6 +47,12 @@ TEST_NAMESPACE=${1:-"test"}
 OUTPUT_DIR="kbak_test_output"
 BUILD_DIR=".."
 
+# Optional encryption: ENCRYPT=1 backs up with a throwaway post-quantum age key, checks no plain *.yaml
+# is written, then decrypts to a temp dir and validates that. Needs age and age-keygen.
+ENCRYPT=${ENCRYPT:-}
+AGE_DIR=""
+PLAIN_DIR=""
+
 # Optional bastion: kubectl and kbak reach the API server through an SSH SOCKS tunnel.
 #   BASTION             ssh destination: ssh_config alias, user@host or ssh://user@host:port
 #   BASTION_SOCKS_PORT  local SOCKS port (default 1080)
@@ -64,6 +70,13 @@ cleanup() {
   fi
   if [ -n "${REMOTE_KUBECONFIG_COPY}" ]; then
     rm -f "${REMOTE_KUBECONFIG_COPY}"
+  fi
+  # Both hold secrets: the private key and the decrypted manifests
+  if [ -n "${AGE_DIR}" ]; then
+    rm -rf "${AGE_DIR}"
+  fi
+  if [ -n "${PLAIN_DIR}" ]; then
+    rm -rf "${PLAIN_DIR}"
   fi
 }
 trap cleanup EXIT
@@ -119,9 +132,20 @@ main() {
   popd || exit
 
 
+  KBAK_ARGS=()
+  if [ -n "${ENCRYPT}" ]; then
+    check_command "age"
+    check_command "age-keygen"
+    AGE_DIR=$(mktemp -d)
+    age-keygen -pq -o "${AGE_DIR}/key.txt" 2> /dev/null
+    age-keygen -y "${AGE_DIR}/key.txt" > "${AGE_DIR}/recipients.txt"
+    KBAK_ARGS=(--age-recipients-file "${AGE_DIR}/recipients.txt")
+    print_info "Encryption enabled with a throwaway post-quantum age key."
+  fi
+
   # Step 2: Run kbak to backup the namespace
   print_info "Running kbak to backup namespace ${TEST_NAMESPACE}..."
-  "${BUILD_DIR}/kbak" --namespace "${TEST_NAMESPACE}" --output "${OUTPUT_DIR}" --verbose
+  "${BUILD_DIR}/kbak" --namespace "${TEST_NAMESPACE}" --output "${OUTPUT_DIR}" --verbose ${KBAK_ARGS[@]+"${KBAK_ARGS[@]}"}
   if [ $? -ne 0 ]; then
     print_error "Failed to run kbak backup."
     exit 1
@@ -141,6 +165,27 @@ main() {
   fi
 
   print_success "Backup created at: ${BACKUP_DIR}"
+
+  if [ -n "${ENCRYPT}" ]; then
+    PLAIN_LEAKS=$(find "${BACKUP_DIR}" -type f ! -name "*.yaml.age")
+    if [ -n "${PLAIN_LEAKS}" ]; then
+      print_error "Found files that are not age-encrypted:"
+      echo "${PLAIN_LEAKS}"
+      exit 1
+    fi
+    print_success "No plain-text files in the encrypted backup."
+
+    PLAIN_DIR=$(mktemp -d)
+    for FILE in $(cd "${BACKUP_DIR}" && find . -type f -name "*.yaml.age"); do
+      mkdir -p "${PLAIN_DIR}/$(dirname "${FILE}")"
+      if ! age -d -i "${AGE_DIR}/key.txt" -o "${PLAIN_DIR}/${FILE%.age}" "${BACKUP_DIR}/${FILE}"; then
+        print_error "Failed to decrypt ${FILE}"
+        exit 1
+      fi
+    done
+    print_success "Decrypted backup to ${PLAIN_DIR}, validating the decrypted files."
+    BACKUP_DIR="${PLAIN_DIR}"
+  fi
 
   # Step 3: Validate backup contents
   print_info "Validating backup contents..."
