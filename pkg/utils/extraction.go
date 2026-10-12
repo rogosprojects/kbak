@@ -53,7 +53,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *v1.PodList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item // Create a new variable to avoid issues with loop variable capture
 			result[i] = &item
 		}
 		return result, len(result)
@@ -61,7 +60,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *appsv1.DeploymentList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -69,7 +67,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *v1.ServiceList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -77,7 +74,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *v1.ConfigMapList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -85,7 +81,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *v1.SecretList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -93,7 +88,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *v1.PersistentVolumeClaimList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -101,7 +95,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *v1.ServiceAccountList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -109,7 +102,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *appsv1.StatefulSetList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -117,7 +109,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *appsv1.DaemonSetList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -125,7 +116,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *networkingv1.IngressList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -133,7 +123,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *rbacv1.RoleList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -141,7 +130,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *rbacv1.RoleBindingList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -149,7 +137,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *batchv1.CronJobList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -157,7 +144,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *batchv1.JobList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
@@ -165,7 +151,6 @@ func ExtractItemsUsingReflection(obj interface{}) ([]interface{}, int) {
 	case *routev1.RouteList:
 		result := make([]interface{}, len(v.Items))
 		for i, item := range v.Items {
-			item := item
 			result[i] = &item
 		}
 		return result, len(result)
