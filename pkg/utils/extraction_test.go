@@ -3,6 +3,7 @@ package utils
 import (
 	"testing"
 
+	routev1 "github.com/openshift/api/route/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -346,5 +347,26 @@ func TestExtractItems(t *testing.T) {
 	}
 	if len(items) != 1 {
 		t.Errorf("ExtractItems(JobList) items length = %v, want %v", len(items), 1)
+	}
+
+	// Test with RouteList (two items, to catch all pointers aliasing one loop variable)
+	routeList := &routev1.RouteList{
+		Items: []routev1.Route{
+			{ObjectMeta: metav1.ObjectMeta{Name: "route1"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "route2"}},
+		},
+	}
+	items, count = ExtractItems(routeList)
+	if count != 2 {
+		t.Fatalf("ExtractItems(RouteList) count = %v, want %v", count, 2)
+	}
+	for i, want := range []string{"route1", "route2"} {
+		route, ok := items[i].(*routev1.Route)
+		if !ok {
+			t.Fatalf("ExtractItems(RouteList) item %d type = %T, want *routev1.Route", i, items[i])
+		}
+		if route.Name != want {
+			t.Errorf("ExtractItems(RouteList) item %d name = %q, want %q", i, route.Name, want)
+		}
 	}
 }
