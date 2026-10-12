@@ -14,33 +14,25 @@ import (
 type K8sClient struct {
 	Clientset *kubernetes.Clientset
 	Config    *rest.Config
+	// Namespace is the default namespace: the current context's, or the pod's when running in-cluster
+	Namespace string
 }
 
-// NewClient creates a new Kubernetes client from the provided kubeconfig path
+// NewClient creates a Kubernetes client the same way kubectl does: the explicit kubeconfig path if set,
+// otherwise $KUBECONFIG or ~/.kube/config, otherwise the in-cluster service account.
 func NewClient(kubeconfig string, verbose bool) (*K8sClient, error) {
-	// Load kubeconfig
-	// First try using in-cluster config if running in a pod
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		// Fall back to kubeconfig file
-		// Get the current context from the kubeconfig
-		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-		loadingRules.ExplicitPath = kubeconfig
-		configOverrides := &clientcmd.ConfigOverrides{}
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = kubeconfig
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
-		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-		clientConfig, err := kubeConfig.ClientConfig()
-		if err != nil {
-			fmt.Printf("%s %s%sError building kubeconfig from current context: %v%s\n",
-				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
-			// Fall back to default config as a last resort
-			config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-			if err != nil {
-				return nil, fmt.Errorf("error building default kubeconfig: %v", err)
-			}
-		} else {
-			config = clientConfig
-		}
+	config, err := kubeConfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error loading Kubernetes configuration: %v", err)
+	}
+
+	namespace, _, err := kubeConfig.Namespace()
+	if err != nil {
+		return nil, fmt.Errorf("error getting current namespace: %v", err)
 	}
 
 	if verbose {
@@ -48,7 +40,6 @@ func NewClient(kubeconfig string, verbose bool) (*K8sClient, error) {
 			utils.K8sEmoji, utils.Blue, utils.Bold, config.Host, utils.Reset)
 	}
 
-	// Create clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Kubernetes client: %v", err)
@@ -57,5 +48,6 @@ func NewClient(kubeconfig string, verbose bool) (*K8sClient, error) {
 	return &K8sClient{
 		Clientset: clientset,
 		Config:    config,
+		Namespace: namespace,
 	}, nil
 }

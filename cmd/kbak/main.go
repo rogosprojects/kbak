@@ -12,8 +12,6 @@ import (
 	"github.com/rogosprojects/kbak/pkg/client"
 	"github.com/rogosprojects/kbak/pkg/utils"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 )
 
 // Version is the current version of kbak.
@@ -76,11 +74,7 @@ func main() {
 	flag.BoolVar(&resFlags.job, "job", false, "Backup only jobs")
 	flag.BoolVar(&resFlags.route, "route", false, "Backup only OpenShift routes")
 
-	if home := homedir.HomeDir(); home != "" {
-		flag.StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"), "Path to kubeconfig file")
-	} else {
-		flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to kubeconfig file")
-	}
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to kubeconfig file (default: $KUBECONFIG, ~/.kube/config, or in-cluster config)")
 
 	flag.Parse()
 
@@ -104,19 +98,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// If namespace is not specified and not using all-namespaces, get the current namespace from kubeconfig
+	// If namespace is not specified and not using all-namespaces, use the kubeconfig (or in-cluster) namespace
 	if namespace == "" && !allNamespaces {
-		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-		loadingRules.ExplicitPath = kubeconfig
-		configOverrides := &clientcmd.ConfigOverrides{}
-		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-		currentNamespace, _, err := kubeConfig.Namespace()
-		if err != nil {
-			fmt.Printf("%s %s%sError getting current namespace: %v%s\n",
-				utils.ErrorEmoji, utils.Red, utils.Bold, err, utils.Reset)
-			os.Exit(1)
-		}
-		namespace = currentNamespace
+		namespace = k8sClient.Namespace
 		if verbose {
 			fmt.Printf(" %sUsing current namespace: %s%s\n",
 				utils.Cyan, namespace, utils.Reset)
