@@ -167,12 +167,6 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 		return
 	}
 
-	// Ensure we clean up the original objects list to free memory
-	// This is especially important for large Job lists
-	defer func() {
-		objects = nil
-	}()
-
 	// Create directory for this resource kind
 	kindDir := filepath.Join(backupDir, resource.Kind)
 	// Owner-only: backups contain Secrets
@@ -227,12 +221,6 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 
 		itemsBackedUp++
 	}
-
-	// Clean up items slice to free memory, especially important for Jobs
-	for i := range items {
-		items[i] = nil
-	}
-	items = nil
 
 	if itemsBackedUp > 0 {
 		fmt.Printf("%s%sBacked up %d %s resources%s\n",

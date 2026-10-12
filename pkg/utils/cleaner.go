@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"slices"
 	"strings"
 
 	routev1 "github.com/openshift/api/route/v1"
@@ -8,7 +9,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,10 +33,6 @@ func CleanObject(obj interface{}) {
 	case *appsv1.DaemonSet:
 		CleanDaemonSet(typedObj)
 
-	// ReplicaSet
-	case *appsv1.ReplicaSet:
-		CleanReplicaSet(typedObj)
-
 	// Job
 	case *batchv1.Job:
 		CleanJob(typedObj)
@@ -49,21 +45,13 @@ func CleanObject(obj interface{}) {
 	case *networkingv1.Ingress:
 		CleanIngress(typedObj)
 
-	// PodDisruptionBudget
-	case *policyv1.PodDisruptionBudget:
-		CleanPDB(typedObj)
-
-	// Role and ClusterRole
+	// Role
 	case *rbacv1.Role:
 		CleanRole(typedObj)
-	case *rbacv1.ClusterRole:
-		CleanClusterRole(typedObj)
 
-	// RoleBinding and ClusterRoleBinding
+	// RoleBinding
 	case *rbacv1.RoleBinding:
 		CleanRoleBinding(typedObj)
-	case *rbacv1.ClusterRoleBinding:
-		CleanClusterRoleBinding(typedObj)
 
 	// Service
 	case *v1.Service:
@@ -88,170 +76,6 @@ func CleanObject(obj interface{}) {
 	// Route (OpenShift)
 	case *routev1.Route:
 		CleanRoute(typedObj)
-
-	// For all other types, try as unstructured
-	default:
-		// For unstructured objects
-		if unstr, ok := obj.(map[string]interface{}); ok {
-			// Remove status
-			delete(unstr, "status")
-
-			// Make sure apiVersion and kind are preserved
-			// Do not delete these fields under any circumstances
-			apiVersion, apiVersionExists := unstr["apiVersion"]
-			kind, kindExists := unstr["kind"]
-
-			// If either field is missing or empty, try to infer them
-			if !apiVersionExists || apiVersion == "" || !kindExists || kind == "" {
-				inferAPIVersionAndKind(unstr)
-			}
-
-			// Clean metadata
-			if metadata, ok := unstr["metadata"].(map[string]interface{}); ok {
-				fieldsToDelete := []string{
-					"creationTimestamp",
-					"resourceVersion",
-					"selfLink",
-					"uid",
-					"generation",
-					"managedFields",
-					"annotations",
-					"ownerReferences",
-				}
-
-				for _, field := range fieldsToDelete {
-					delete(metadata, field)
-				}
-
-				// Remove system annotations but keep user ones
-				if annotations, ok := metadata["annotations"].(map[string]interface{}); ok {
-					for k := range annotations {
-						if IsSystemAnnotation(k) {
-							delete(annotations, k)
-						}
-					}
-					// If no annotations left, remove the map
-					if len(annotations) == 0 {
-						delete(metadata, "annotations")
-					}
-				}
-			}
-		}
-	}
-}
-
-// inferAPIVersionAndKind attempts to set apiVersion and kind for unstructured objects
-// if they're missing. This is a fallback mechanism.
-func inferAPIVersionAndKind(obj map[string]interface{}) {
-	// Try to infer apiVersion if kind exists
-	if kind, ok := obj["kind"].(string); ok && kind != "" {
-		// Set apiVersion based on kind if possible
-		switch kind {
-		case "Pod", "Service", "ConfigMap", "Secret", "ServiceAccount", "PersistentVolumeClaim", "Namespace":
-			obj["apiVersion"] = "v1"
-		case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet":
-			obj["apiVersion"] = "apps/v1"
-		case "Ingress", "IngressClass", "NetworkPolicy":
-			obj["apiVersion"] = "networking.k8s.io/v1"
-		case "Role", "RoleBinding", "ClusterRole", "ClusterRoleBinding":
-			obj["apiVersion"] = "rbac.authorization.k8s.io/v1"
-		case "Job", "CronJob":
-			obj["apiVersion"] = "batch/v1"
-		case "HorizontalPodAutoscaler":
-			obj["apiVersion"] = "autoscaling/v2"
-		case "PodDisruptionBudget":
-			obj["apiVersion"] = "policy/v1"
-		case "CustomResourceDefinition":
-			obj["apiVersion"] = "apiextensions.k8s.io/v1"
-		}
-	}
-
-	// Try to infer kind if apiVersion exists
-	if apiVersion, ok := obj["apiVersion"].(string); ok && apiVersion != "" {
-		// If there's already a kind, don't overwrite it
-		if _, hasKind := obj["kind"].(string); !hasKind {
-			switch apiVersion {
-			case "v1":
-				// Default to Pod if we have to guess
-				obj["kind"] = "Pod"
-			case "apps/v1":
-				// Default to Deployment
-				obj["kind"] = "Deployment"
-			case "batch/v1":
-				// Default to Job
-				obj["kind"] = "Job"
-			case "networking.k8s.io/v1":
-				// Default to Ingress
-				obj["kind"] = "Ingress"
-			case "rbac.authorization.k8s.io/v1":
-				// Default to Role
-				obj["kind"] = "Role"
-			}
-		}
-	}
-
-	// If still no apiVersion and kind, try to infer from metadata or resource structure
-	if _, hasApiVersion := obj["apiVersion"].(string); !hasApiVersion {
-		if _, hasKind := obj["kind"].(string); !hasKind {
-			// Try to infer from metadata.name patterns
-			if metadata, ok := obj["metadata"].(map[string]interface{}); ok {
-				if name, ok := metadata["name"].(string); ok && name != "" {
-					// Name-based heuristic
-					nameLower := strings.ToLower(name)
-					if strings.Contains(nameLower, "deploy") {
-						obj["kind"] = "Deployment"
-						obj["apiVersion"] = "apps/v1"
-					} else if strings.Contains(nameLower, "svc") || strings.Contains(nameLower, "service") {
-						obj["kind"] = "Service"
-						obj["apiVersion"] = "v1"
-					} else if strings.Contains(nameLower, "cm") || strings.Contains(nameLower, "config") {
-						obj["kind"] = "ConfigMap"
-						obj["apiVersion"] = "v1"
-					} else if strings.Contains(nameLower, "secret") {
-						obj["kind"] = "Secret"
-						obj["apiVersion"] = "v1"
-					} else if strings.Contains(nameLower, "pod") {
-						obj["kind"] = "Pod"
-						obj["apiVersion"] = "v1"
-					} else if strings.Contains(nameLower, "job") {
-						obj["kind"] = "Job"
-						obj["apiVersion"] = "batch/v1"
-					} else if strings.Contains(nameLower, "cron") {
-						obj["kind"] = "CronJob"
-						obj["apiVersion"] = "batch/v1"
-					} else if strings.Contains(nameLower, "ing") {
-						obj["kind"] = "Ingress"
-						obj["apiVersion"] = "networking.k8s.io/v1"
-					} else if strings.Contains(nameLower, "role") && !strings.Contains(nameLower, "cluster") {
-						obj["kind"] = "Role"
-						obj["apiVersion"] = "rbac.authorization.k8s.io/v1"
-					} else if strings.Contains(nameLower, "binding") && !strings.Contains(nameLower, "cluster") {
-						obj["kind"] = "RoleBinding"
-						obj["apiVersion"] = "rbac.authorization.k8s.io/v1"
-					} else if strings.Contains(nameLower, "sa") || strings.Contains(nameLower, "serviceaccount") {
-						obj["kind"] = "ServiceAccount"
-						obj["apiVersion"] = "v1"
-					} else if strings.Contains(nameLower, "pvc") || strings.Contains(nameLower, "claim") {
-						obj["kind"] = "PersistentVolumeClaim"
-						obj["apiVersion"] = "v1"
-					} else if strings.Contains(nameLower, "sts") || strings.Contains(nameLower, "stateful") {
-						obj["kind"] = "StatefulSet"
-						obj["apiVersion"] = "apps/v1"
-					} else if strings.Contains(nameLower, "ds") || strings.Contains(nameLower, "daemon") {
-						obj["kind"] = "DaemonSet"
-						obj["apiVersion"] = "apps/v1"
-					}
-				}
-			}
-
-			// If still no values, set defaults as last resort
-			if _, hasApiVersion := obj["apiVersion"].(string); !hasApiVersion {
-				obj["apiVersion"] = "v1"
-			}
-			if _, hasKind := obj["kind"].(string); !hasKind {
-				obj["kind"] = "Pod" // Default to Pod as last resort
-			}
-		}
 	}
 }
 
@@ -261,7 +85,11 @@ func IsSystemAnnotation(key string) bool {
 	// User-set keys under system prefixes that a restore needs
 	case "kubernetes.io/ingress.class", "kubernetes.io/service-account.name":
 		return false
-	case "volume.beta.kubernetes.io/storage-provisioner":
+	case "volume.beta.kubernetes.io/storage-provisioner",
+		// OpenShift: admitting SCC, and the generated pull secret it re-creates for a restored ServiceAccount
+		"openshift.io/scc", "openshift.io/internal-registry-pull-secret-ref",
+		// Multus network status (the user-set request is k8s.v1.cni.cncf.io/networks and is kept)
+		"k8s.v1.cni.cncf.io/network-status", "k8s.v1.cni.cncf.io/networks-status":
 		return true
 	}
 
@@ -276,6 +104,12 @@ func IsSystemAnnotation(key string) bool {
 		"meta.helm.sh/",
 		"pv.kubernetes.io/",
 		"volume.kubernetes.io/",
+		"k8s.ovn.org/",
+		// Status the OpenShift service CA writes on a Service; serving-cert-secret-name is the user's request
+		"service.beta.openshift.io/serving-cert-signed-by",
+		"service.alpha.openshift.io/serving-cert-signed-by",
+		"service.beta.openshift.io/serving-cert-generation-error",
+		"service.alpha.openshift.io/serving-cert-generation-error",
 	}
 
 	for _, prefix := range systemPrefixes {
@@ -333,6 +167,12 @@ func CleanJobLabels(meta *metav1.ObjectMeta) {
 
 // CleanPod removes server-side fields from a Pod
 func CleanPod(pod *v1.Pod) {
+	saName := pod.Spec.ServiceAccountName
+	if saName == "" {
+		saName = "default"
+	}
+	pod.Spec.ImagePullSecrets = dropGeneratedPullSecrets(pod.Spec.ImagePullSecrets, saName)
+
 	// Remove status
 	pod.Status = v1.PodStatus{}
 
@@ -483,8 +323,18 @@ func CleanServiceAccount(sa *v1.ServiceAccount) {
 
 	// Clean other server-generated fields
 	sa.Secrets = nil // Server manages the secrets references
+	sa.ImagePullSecrets = dropGeneratedPullSecrets(sa.ImagePullSecrets, sa.Name)
 
 	// Keep user-set fields like imagePullSecrets and automountServiceAccountToken
+}
+
+// dropGeneratedPullSecrets removes the <sa>-dockercfg-<random> pull secret OpenShift generates and injects into
+// ServiceAccounts and Pods. The secret is skipped from backups and regenerated with a new name on restore.
+// shortcut: matches by name, so a user secret named <sa>-dockercfg-* is dropped too; match the owning annotation if that bites.
+func dropGeneratedPullSecrets(refs []v1.LocalObjectReference, saName string) []v1.LocalObjectReference {
+	return slices.DeleteFunc(refs, func(r v1.LocalObjectReference) bool {
+		return strings.HasPrefix(r.Name, saName+"-dockercfg-")
+	})
 }
 
 // CleanMetadata removes server-side fields from ObjectMeta
@@ -588,33 +438,6 @@ func CleanDaemonSet(daemonset *appsv1.DaemonSet) {
 	}
 }
 
-// CleanReplicaSet removes server-side fields from a ReplicaSet
-func CleanReplicaSet(replicaset *appsv1.ReplicaSet) {
-	// Remove status
-	replicaset.Status = appsv1.ReplicaSetStatus{}
-
-	// Clean metadata
-	CleanMetadata(&replicaset.ObjectMeta)
-
-	// Clean template metadata but preserve essential fields
-	CleanMetadata(&replicaset.Spec.Template.ObjectMeta)
-
-	// Set API version and kind for valid Kubernetes manifests
-	replicaset.APIVersion = "apps/v1"
-	replicaset.Kind = "ReplicaSet"
-
-	// Ensure selector is preserved (it's required for replicasets)
-	if replicaset.Spec.Selector == nil || len(replicaset.Spec.Selector.MatchLabels) == 0 {
-		// If no selector, create one that matches template labels
-		if replicaset.Spec.Template.Labels != nil && len(replicaset.Spec.Template.Labels) > 0 {
-			if replicaset.Spec.Selector == nil {
-				replicaset.Spec.Selector = &metav1.LabelSelector{}
-			}
-			replicaset.Spec.Selector.MatchLabels = replicaset.Spec.Template.Labels
-		}
-	}
-}
-
 // CleanJob removes server-side fields from a Job
 func CleanJob(job *batchv1.Job) {
 	// Remove status
@@ -687,19 +510,6 @@ func CleanIngress(ingress *networkingv1.Ingress) {
 	ingress.Kind = "Ingress"
 }
 
-// CleanPDB removes server-side fields from a PodDisruptionBudget
-func CleanPDB(pdb *policyv1.PodDisruptionBudget) {
-	// Remove status
-	pdb.Status = policyv1.PodDisruptionBudgetStatus{}
-
-	// Clean metadata
-	CleanMetadata(&pdb.ObjectMeta)
-
-	// Set API version and kind for valid Kubernetes manifests
-	pdb.APIVersion = "policy/v1"
-	pdb.Kind = "PodDisruptionBudget"
-}
-
 // CleanRole removes server-side fields from a Role
 func CleanRole(role *rbacv1.Role) {
 	// Clean metadata
@@ -710,16 +520,6 @@ func CleanRole(role *rbacv1.Role) {
 	role.Kind = "Role"
 }
 
-// CleanClusterRole removes server-side fields from a ClusterRole
-func CleanClusterRole(clusterRole *rbacv1.ClusterRole) {
-	// Clean metadata
-	CleanMetadata(&clusterRole.ObjectMeta)
-
-	// Set API version and kind for valid Kubernetes manifests
-	clusterRole.APIVersion = "rbac.authorization.k8s.io/v1"
-	clusterRole.Kind = "ClusterRole"
-}
-
 // CleanRoleBinding removes server-side fields from a RoleBinding
 func CleanRoleBinding(roleBinding *rbacv1.RoleBinding) {
 	// Clean metadata
@@ -728,16 +528,6 @@ func CleanRoleBinding(roleBinding *rbacv1.RoleBinding) {
 	// Set API version and kind for valid Kubernetes manifests
 	roleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
 	roleBinding.Kind = "RoleBinding"
-}
-
-// CleanClusterRoleBinding removes server-side fields from a ClusterRoleBinding
-func CleanClusterRoleBinding(clusterRoleBinding *rbacv1.ClusterRoleBinding) {
-	// Clean metadata
-	CleanMetadata(&clusterRoleBinding.ObjectMeta)
-
-	// Set API version and kind for valid Kubernetes manifests
-	clusterRoleBinding.APIVersion = "rbac.authorization.k8s.io/v1"
-	clusterRoleBinding.Kind = "ClusterRoleBinding"
 }
 
 // CleanRoute removes server-side fields from an OpenShift Route

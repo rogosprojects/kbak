@@ -28,15 +28,6 @@ func TestExtractName(t *testing.T) {
 			expected: "test-pod",
 		},
 		{
-			name: "Unstructured object with name",
-			input: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"name": "test-unstructured",
-				},
-			},
-			expected: "test-unstructured",
-		},
-		{
 			name:     "Nil object",
 			input:    nil,
 			expected: "",
@@ -102,20 +93,12 @@ func TestExtractItems(t *testing.T) {
 		t.Errorf("ExtractItems(DeploymentList) items length = %v, want %v", len(items), 1)
 	}
 
-	// Test with unstructured object
-	unstructured := map[string]interface{}{
-		"items": []interface{}{
-			map[string]interface{}{"name": "item1"},
-			map[string]interface{}{"name": "item2"},
-		},
+	// Non-list values yield nothing
+	if items, count = ExtractItems("not-a-list"); count != 0 || len(items) != 0 {
+		t.Errorf("ExtractItems(string) = %v, %v, want no items", items, count)
 	}
-
-	items, count = ExtractItems(unstructured)
-	if count != 2 {
-		t.Errorf("ExtractItems(unstructured) count = %v, want %v", count, 2)
-	}
-	if len(items) != 2 {
-		t.Errorf("ExtractItems(unstructured) items length = %v, want %v", len(items), 2)
+	if items, count = ExtractItems(&corev1.Pod{}); count != 0 || len(items) != 0 {
+		t.Errorf("ExtractItems(Pod) = %v, %v, want no items", items, count)
 	}
 
 	// Test with empty list
