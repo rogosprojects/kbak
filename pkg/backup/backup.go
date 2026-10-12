@@ -175,7 +175,8 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 
 	// Create directory for this resource kind
 	kindDir := filepath.Join(backupDir, resource.Kind)
-	if err := os.MkdirAll(kindDir, 0755); err != nil {
+	// Owner-only: backups contain Secrets
+	if err := os.MkdirAll(kindDir, 0700); err != nil {
 		fmt.Printf("%s %s%sError creating directory for %s: %v%s\n",
 			utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, err, utils.Reset)
 		stats.ErrorCount++
@@ -216,7 +217,7 @@ func backupResourceType(k8sClient *client.K8sClient, namespace, backupDir string
 
 		// Save to file
 		filename := filepath.Join(kindDir, safeName+".yaml")
-		if err := os.WriteFile(filename, yamlData, 0644); err != nil {
+		if err := os.WriteFile(filename, yamlData, 0600); err != nil {
 			fmt.Printf("%s %s%sError writing %s '%s': %v%s\n",
 				utils.ErrorEmoji, utils.Red, utils.Bold, resource.Kind, name, err, utils.Reset)
 			stats.ErrorCount++

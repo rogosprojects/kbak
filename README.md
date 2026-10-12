@@ -51,9 +51,14 @@ sudo cp kbak /usr/local/bin/
 # Build the Docker image
 docker build -t kbak:latest .
 
-# Run with your kubeconfig mounted
-docker run --rm -v ~/.kube:/root/.kube -v $(pwd)/backups:/backups kbak:latest --namespace your-namespace
+# Run with your kubeconfig mounted, as your own user so you can read the files
+mkdir -p backups
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v ~/.kube/config:/kube/config:ro -e KUBECONFIG=/kube/config \
+  -v "$(pwd)/backups:/backups" kbak:latest --namespace your-namespace
 ```
+
+Backup files are created readable only by their owner (`0600`, folders `0700`), because they include Secrets.
 
 ## Usage
 
