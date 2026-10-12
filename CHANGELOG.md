@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.2.0] - 2026-10-12
+### :sparkles: New Features
+- [`2aaed49`](https://github.com/rogosprojects/kbak/commit/2aaed49387bc85471c36ee428e834036a2226f02) - back up OpenShift Routes *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`654af67`](https://github.com/rogosprojects/kbak/commit/654af6772e60d3d4b173fa24bba8c63c56c084dc) - add --route flag to back up only OpenShift Routes *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`b6a1f3e`](https://github.com/rogosprojects/kbak/commit/b6a1f3e97152c7db6037eadd1e2226f3e3388283) - add age encryption support for backup files *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+### :bug: Bug Fixes
+- [`be25e3a`](https://github.com/rogosprojects/kbak/commit/be25e3a35a04e32931f25cbd9364b2746afd10de) - **client**: honor $KUBECONFIG and the in-cluster namespace *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`e99f1b3`](https://github.com/rogosprojects/kbak/commit/e99f1b319da0fb8ca203a0e679d334fced1e3ee8) - **cmd**: fail on a missing namespace and merge the backup paths *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`16fda1e`](https://github.com/rogosprojects/kbak/commit/16fda1e26a0087fb14852881c74de774cd13d5c4) - name backup folders YYYY-MM-DD_HH-MM-SS *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`af6adb7`](https://github.com/rogosprojects/kbak/commit/af6adb75a3c883e47bb7aa7773215f0271d0183f) - **backup**: skip objects the cluster recreates on its own *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`dbb28e1`](https://github.com/rogosprojects/kbak/commit/dbb28e1af0d94c86bfb4b111ffb3a64a30840543) - **backup**: make backup files readable only by their owner *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`6878bac`](https://github.com/rogosprojects/kbak/commit/6878bac62903d4ced4bc3af1ab06b1220b03f2a4) - **cleaner**: preserve user-set Service and PVC fields across restores *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`7e3d2e3`](https://github.com/rogosprojects/kbak/commit/7e3d2e3d0adbeae76fd2d451863ee6e2a87147d4) - **cleaner**: keep user settings and drop binding state a restore can't reuse *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+### :recycle: Refactors
+- [`5b276d7`](https://github.com/rogosprojects/kbak/commit/5b276d7d7f2d4caa495fb5993fb30bec1747ce0c) - drop loop variable copies obsolete since Go 1.22 *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+- [`fb15e86`](https://github.com/rogosprojects/kbak/commit/fb15e863dbe9858830f033f5eac9bbc1bbd59f45) - **utils**: drop unreachable code and extract list items generically *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+### :white_check_mark: Tests
+- [`1837adb`](https://github.com/rogosprojects/kbak/commit/1837adb1742eeda03f8ebe28ebd92bd384ed2f70) - cover RouteList extraction *(commit by [@rogosprojects](https://github.com/rogosprojects))*
+
+
 ## [v0.1.12] - 2025-05-26
 ### :sparkles: New Features
 - [`73047b9`](https://github.com/rogosprojects/kbak/commit/73047b9d9e61c321fa24b0891b5e4b4b45b537e8) - better cleaner step for Jobs *(commit by [@rogosprojects](https://github.com/rogosprojects))*
@@ -84,3 +107,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.10]: https://github.com/rogosprojects/kbak/compare/v0.1.9...v0.1.10
 [v0.1.11]: https://github.com/rogosprojects/kbak/compare/v0.1.10...v0.1.11
 [v0.1.12]: https://github.com/rogosprojects/kbak/compare/v0.1.11...v0.1.12
+[v0.2.0]: https://github.com/rogosprojects/kbak/compare/v0.1.12...v0.2.0
